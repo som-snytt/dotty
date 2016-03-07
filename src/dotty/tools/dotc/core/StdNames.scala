@@ -117,6 +117,7 @@ object StdNames {
     val PROTECTED_PREFIX: N           = "protected$"
     val PROTECTED_SET_PREFIX: N       = PROTECTED_PREFIX + "set"
     val ROOT: N                       = "<root>"
+    val SCRIPT_PACKAGE: N             = "<script>"
     val SHADOWED: N                   = "(shadowed)"  // tag to be used until we have proper name kinds
     val SINGLETON_SUFFIX: N           = ".type"
     val SPECIALIZED_SUFFIX: N         = "$sp"

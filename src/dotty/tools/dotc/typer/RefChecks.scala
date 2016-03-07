@@ -1208,7 +1208,8 @@ class RefChecks extends MiniPhase { thisTransformer =>
         sym.isRealMethod &&
         sym.isCase &&
         sym.name == nme.apply &&
-        isClassTypeAccessible(tree)
+        isClassTypeAccessible(tree) &&
+        !tree.tpe.resultType.typeSymbol.primaryConstructor.isLessAccessibleThan(tree.symbol)
 
       if (doTransform) {
         tree foreach {

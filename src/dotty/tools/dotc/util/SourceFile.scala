@@ -30,6 +30,7 @@ object ScriptSourceFile {
       } else 0
     new SourceFile(file, content drop headerLength) {
       override val underlying = new SourceFile(file, content)
+      override def start = headerLength
     }
   }
 }
@@ -73,7 +74,6 @@ case class SourceFile(file: AbstractFile, content: Array[Char]) extends interfac
   def isSelfContained = underlying eq this
 
   /** Map a position to a position in the underlying source file.
-   *  For regular source files, simply return the argument.
    */
   def positionInUltimateSource(position: SourcePosition): SourcePosition =
     SourcePosition(underlying, position.pos shift start)

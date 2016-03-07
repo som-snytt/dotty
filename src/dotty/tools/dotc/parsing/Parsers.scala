@@ -49,8 +49,8 @@ object Parsers {
    *  if not, the AST will be supplemented.
    */
   def parser(source: SourceFile)(implicit ctx: Context) =
-    if (source.isSelfContained) new ScriptParser(source)
-    else new Parser(source)
+    if (source.isSelfContained) new Parser(source)
+    else new ScriptParser(source)
 
   abstract class ParserCommon(val source: SourceFile)(implicit ctx: Context) extends DotClass {
 

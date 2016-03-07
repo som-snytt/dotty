@@ -5,57 +5,70 @@ package parsing
 import util.SourceFile
 import core._
 import Contexts._
+import Decorators._
 import Parsers._
+import Tokens._
+import Names._
+import StdNames._
+import Phases._
+import ast.Trees._
+import Flags._
+import Names._
 
-
-/** <p>Performs the following context-free rewritings:</p>
- *  <ol>
- *    <li>
- *      Places all pattern variables in Bind nodes. In a pattern, for
- *      identifiers <code>x</code>:<pre>
- *                 x  => x @ _
- *               x:T  => x @ (_ : T)</pre>
- *    </li>
- *    <li>Removes pattern definitions (PatDef's) as follows:
- *      If pattern is a simple (typed) identifier:<pre>
- *        <b>val</b> x = e     ==>  <b>val</b> x = e
- *        <b>val</b> x: T = e  ==>  <b>val</b> x: T = e</pre>
- *
- *      if there are no variables in pattern<pre>
- *        <b>val</b> p = e  ==>  e match (case p => ())</pre>
- *
- *      if there is exactly one variable in pattern<pre>
- *        <b>val</b> x_1 = e <b>match</b> (case p => (x_1))</pre>
- *
- *      if there is more than one variable in pattern<pre>
- *        <b>val</b> p = e  ==>  <b>private synthetic val</b> t$ = e <b>match</b> (case p => (x_1, ..., x_N))
- *                        <b>val</b> x_1 = t$._1
- *                        ...
- *                        <b>val</b> x_N = t$._N</pre>
- *    </li>
- *    <li>
- *       Removes function types as follows:<pre>
- *        (argtpes) => restpe   ==>   scala.Function_n[argtpes, restpe]</pre>
- *    </li>
- *    <li>
- *      Wraps naked case definitions in a match as follows:<pre>
- *        { cases }   ==>   (x => x.match {cases})<span style="font-family:normal;">, except when already argument to match</span></pre>
- *    </li>
- *  </ol>
- */
 object ScriptParsers {
 
   import ast.untpd._
 
   class ScriptParser(source: SourceFile)(implicit ctx: Context) extends Parser(source) {
 
+    /** This is the parse entry point for code which is not self-contained, i.e.,
+     *  a script which is a series of template statements.
+     *
+     *  The statements are wrapped in a special package object named `<script>`.
+     *  The scripter phase will normally turn this tree into something more useful.
+     */
+    override def parse(): Tree = {
+      val (_, stmts) = templateStatSeq()
+      accept(EOF)
+      makeScriptPackage(0, stmts)
+    }
+
+    // wrap in package object, so it could compile without further ado. (Except <script> is unfriendly package name.)
+    private def makeScriptPackage(start: Int, stats: List[Tree]): Tree =
+      makePackageObject(nme.SCRIPT_PACKAGE, start, stats)
+
+    // package module doesn't need to be wrapped in package: `package object script extends App { ...$stmts }`
+    private def makePackageObject(name: TermName, start: Int, stats: List[Tree]): Tree = {
+      val ctor = atPos(start, start, start) { ast.untpd.emptyConstructor }
+      val template = Template(ctor, List(Ident("App".toTypeName)), EmptyValDef, stats).withPos(ctor.pos.toSynthetic)
+      ModuleDef(name, template).withMods(Modifiers(Package)).withPos(ctor.pos.toSynthetic)
+    }
+  }
+
+  /** The default scripter phase is an untyped transform that wraps snippets as required for execution.
+   */
+  class Scripter extends Phase {
+    override def phaseName = "scripter"
+    override def run(implicit ctx: Context): Unit = {
+      val unit = ctx.compilationUnit
+      unit.untpdTree = unit.untpdTree match {
+        case tree @ ModuleDef(nme.SCRIPT_PACKAGE, template) => ModuleDef(scriptName, template).withMods(Modifiers(Package))
+        //case tree => ctx.error(s"scripting unknown tree ${ tree.show }") ; EmptyTree
+        case tree => ctx.println(tree.show) ; tree
+        //case tree => tree
+      }
+    }
+
+    // TODO: settable or inferrable
+    def scriptName: TermName = "script".toTermName
+
+    /* TODO: reinstantiate
     /** This is the parse entry point for code which is not self-contained, e.g.
      *  a script which is a series of template statements.  They will be
      *  swaddled in Trees until the AST is equivalent to the one returned
      *  by compilationUnit().
      */
     override def parse(): Tree = unsupported("parse")
-    /* TODO: reinstantiate
       val stmts = templateStatSeq(false)._2
       accept(EOF)
 

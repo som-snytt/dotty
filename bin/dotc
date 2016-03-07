@@ -38,7 +38,10 @@ unset verbose quiet cygwin toolcp colors saved_stty CDPATH
 
 CompilerMain=dotty.tools.dotc.Main
 FromTasty=dotty.tools.dotc.FromTasty
-ReplMain=dotty.tools.dotc.repl.Main
+#ReplMain=test.DottyRepl
+#ReplMain=dotty.tools.dotc.repl.Main
+ReplMain=dotty.tools.dotc.dopler.Main
+ScriptedMain=dotty.tools.dotc.Scripted
 
 
 
@@ -48,12 +51,14 @@ MAIN_JAR=$DOTTY_ROOT/target/scala-$SCALA_BINARY_VERSION/dotty_$SCALA_BINARY_VERS
 TEST_JAR=$DOTTY_ROOT/target/scala-$SCALA_BINARY_VERSION/dotty_$SCALA_BINARY_VERSION-$DOTTY_VERSION-tests.jar
 DOTTY_JAR=$DOTTY_ROOT/dotty.jar
 
+[[ -z $sbt_cmd ]] && sbt_cmd="sbt"
+
 function checkjar {
   if [ ! -f "$1" ]
   then
     echo "The script is going to build the required jar file $1 by running \"sbt $2\""
     cd $DOTTY_ROOT
-    sbt "$2"
+    $sbt_cmd "$2"
     cd -
     if [ ! -f "$1" ]
     then
@@ -68,7 +73,7 @@ function checkjar {
     then
       echo "new files detected. rebuilding"
       cd $DOTTY_ROOT
-      sbt "$2"
+      $sbt_cmd "$2"
       touch "$1"
       cd -
     fi
@@ -254,7 +259,8 @@ case "$1" in
     # Optimize for short-running applications, see https://github.com/lampepfl/dotty/issues/222
     -Oshort) addJava "-XX:+TieredCompilation -XX:TieredStopAtLevel=1" && shift ;;
         -repl) main_class=$ReplMain && shift ;;
-        -tasty) main_class=$FromTasty && shift ;;
+      -script) main_class=$ScriptedMain && shift ;;
+       -tasty) main_class=$FromTasty && shift ;;
      -compile) main_class=$CompilerMain && shift ;;
          -run) main_class=$ReplMain && shift ;;
          -fsc) main_class=$FscMain && shift ;;

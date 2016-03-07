@@ -100,6 +100,7 @@ class ScalaSettings extends Settings.SettingGroup {
 
   /** -Y "Private" settings
    */
+  val couleurs = BooleanSetting("-Ycouleurs", "Visually enhanced diagnostic output.")
   val overrideObjects = BooleanSetting("-Yoverride-objects", "Allow member objects to be overridden.")
   val overrideVars = BooleanSetting("-Yoverride-vars", "Allow vars to be overridden.")
   val Yhelp = BooleanSetting("-Y", "Print a synopsis of private options.")

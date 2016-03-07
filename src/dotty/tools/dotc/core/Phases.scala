@@ -367,6 +367,12 @@ object Phases {
     current.map(_.flatMap(phase =>
       if (oldPhaseClass.isInstance(phase)) newPhases(phase) else phase :: Nil))
 
+  /** Replace by name.
+   */
+  def replaceByName(phaseName: String, newPhases: Phase => List[Phase], current: List[List[Phase]]): List[List[Phase]] =
+    current.map(_.flatMap(phase =>
+      if (phase.phaseName == phaseName) newPhases(phase) else phase :: Nil))
+
   /** Dotty deviation: getClass yields Class[_], instead of [Class <: <type of receiver>].
    *  We can get back the old behavior using this decorator. We should also use the same
    *  trick for standard getClass.

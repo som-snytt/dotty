@@ -163,6 +163,7 @@ object Settings {
       def update(x: T)(implicit ctx: Context): SettingsState = setting.updateIn(ctx.sstate, x)
       def isDefault(implicit ctx: Context): Boolean = setting.isDefaultIn(ctx.sstate)
     }
+    implicit def `flag setting`(setting: Setting[Boolean])(implicit ctx: Context): Boolean = setting.valueIn(ctx.sstate)
   }
 
   class SettingGroup {
