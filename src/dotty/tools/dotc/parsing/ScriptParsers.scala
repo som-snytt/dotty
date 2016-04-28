@@ -54,7 +54,7 @@ object ScriptParsers {
       unit.untpdTree = unit.untpdTree match {
         case tree @ ModuleDef(nme.SCRIPT_PACKAGE, template) => ModuleDef(scriptName, template).withMods(Modifiers(Package))
         //case tree => ctx.error(s"scripting unknown tree ${ tree.show }") ; EmptyTree
-        case tree => ctx.println(tree.show) ; tree
+        case tree => ctx.echo(tree.show) ; tree
         //case tree => tree
       }
     }

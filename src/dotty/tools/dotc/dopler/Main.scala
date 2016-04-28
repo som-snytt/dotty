@@ -99,7 +99,7 @@ object Main extends Driver {
       } catch {
         case e: Throwable => e.printStackTrace() ; "<error>"
       }
-      ctx.println(res)
+      ctx.echo(res)
     }
     ctx.reporter
   }
@@ -110,7 +110,7 @@ object Main extends Driver {
     val sr = SplashReader(newReader(ctx)) { r =>
       r.postInit()
     }
-    welcome foreach (ctx.println(_))
+    welcome foreach (ctx.echo(_))
     SplashLoop(sr, prompt)
   }
 
@@ -157,8 +157,8 @@ object Main extends Driver {
     implicit val ctx: FreshContext = setupContext.fresh
     ctx.setReporter(new ReplReporter)
 
-    ctx.println("[info] started at " + new java.util.Date)
-    if (fileNames.nonEmpty) ctx.println("Processing no files...")
+    ctx.echo("[info] started at " + new java.util.Date)
+    if (fileNames.nonEmpty) ctx.echo("Processing no files...")
 
     // don't print verbose diagnostics during startup
     def withSuppressedSettings[A](body: => A): A = {
@@ -175,7 +175,7 @@ object Main extends Driver {
         val repl = newCompiler
         val input = 
           if (ctx.reporter.hasErrors) {
-            ctx.println("Interpreter encountered errors during initialization!")
+            ctx.echo("Interpreter encountered errors during initialization!")
             None
           } else {
             init(repl)
@@ -188,7 +188,7 @@ object Main extends Driver {
 
     startup match {
       case (repl, Some(null), _) =>
-        try ctx println scala.tools.nsc.Properties.shellInterruptedString
+        try ctx echo scala.tools.nsc.Properties.shellInterruptedString
         finally ()  // repl.close()
       case (_, None, _)          => Console println s"line was error"
       case (repl: ReplCompiler, Some(line), reader) => loop(repl, line, reader)

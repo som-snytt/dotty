@@ -62,7 +62,7 @@ object InteractiveReader {
     type ReaderMaker = Completer => InteractiveReader
 
     def instantiater(className: String): ReaderMaker = completer => {
-      if (ctx.settings.debug) ctx.println(s"Trying to instantiate an InteractiveReader from $className")
+      if (ctx.settings.debug) ctx.echo(s"Trying to instantiate an InteractiveReader from $className")
       Class.forName(className).getConstructor(classOf[Completer]).newInstance(completer).asInstanceOf[InteractiveReader]
     }
     def defaultCompleter = NoCompletion // new PresentationCompilerCompleter(intp)
@@ -77,7 +77,7 @@ object InteractiveReader {
         case (cls, Failure(e)) => s"  - $cls --> \n\t" + scala.tools.nsc.util.stackTraceString(e) + "\n"
         case (cls, Success(_)) => s"  - $cls OK"
       }
-      ctx.println(s"All InteractiveReaders tried: ${readerDiags.mkString("\n","\n","\n")}")
+      ctx.echo(s"All InteractiveReaders tried: ${readerDiags.mkString("\n","\n","\n")}")
     }
     reader
   }
