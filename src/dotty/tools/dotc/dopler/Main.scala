@@ -28,22 +28,12 @@ import java.io.{BufferedWriter, OutputStreamWriter}
 
 /** A resident interpreter for dotty.
  */
-object Main extends Driver {
+object Main extends Driver with Promptly {
 
   var repl: Option[ReadEvalPrint] = None
 
-  import Implicits._
-
-  object Prompts {
-    def prompt1 = "dopler> "
-    def prompt2 = {
-      val f = f"%%${prompt1.length}s"
-      f format "| "
-    }
-  }
   import Prompts._
-
-  val prompt = f"%n$prompt1"   // scala.tools.nsc.Properties.shellPromptString
+  import Implicits._
 
   // An ordinary compiler with default front-end scripter.
   // TODO settings
@@ -198,6 +188,19 @@ object Main extends Driver {
   }
 }
 
+trait Promptly {
+  object Prompts {
+    def prompt1 = "dopler> "
+    def prompt2 = {
+      val f = f"%%${prompt1.length}s"
+      f format "| "
+    }
+  }
+
+  import Prompts._
+  def prompt = f"%n$prompt1"   // scala.tools.nsc.Properties.shellPromptString
+}
+
 object Implicits {
 
   implicit class `msg color`(val sc: StringContext) extends AnyVal {
@@ -250,7 +253,7 @@ trait ColorCommentary { _: ConsoleReporter =>
   override def doReport(d: Diagnostic)(implicit ctx: Context): Unit = d match {
     case d: Error =>
       printMessageAndPos(msg"$d", d.pos)
-      if (ctx.settings.prompt.value) displayPrompt()
+      if (ctx.settings.prompt) displayPrompt()
     case d: ConditionalWarning if !d.enablingOption.value =>
     case d: MigrationWarning =>
       printMessageAndPos(msg"$d", d.pos)

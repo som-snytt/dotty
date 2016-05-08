@@ -46,34 +46,34 @@ class Reprinter extends transform.MacroTransform {
   import tpd.Tree
   import ReadEvalPrint._
   override def phaseName = "reprinter"
-  private var repl: ReadEvalPrint = _
+  private var repl: Option[ReadEvalPrint] = _
   val analyzer = new Restringer
+
+  private def unit(implicit ctx: Context): CompilationUnit = ctx.compilationUnit
+
   // reanalyze trees and replace toString
   override def run(implicit ctx: Context): Unit = {
-    val unit = ctx.compilationUnit
-    for (repl <- unit.untpdTree.getAttachment(ReplAttachment)) {
-      Reprinter.this.repl = repl
-      unit.tpdTree = analyzer.replate(unit.tpdTree)
-      Reprinter.this.repl = unit.tpdTree.attachment(ReplAttachment)
-    }
+    for {
+      repl0 <- unit.untpdTree.getAttachment(ReplAttachment)
+      repl <- {
+        Reprinter.this.repl = Some(repl0)
+        unit.tpdTree = analyzer.replate(unit.tpdTree)
+        unit.tpdTree.getAttachment(ReplAttachment)
+      }
+    } Reprinter.this.repl = Some(repl)
     super.run
   }
   override def newTransformer(implicit ctx: Context): Transformer = new Transformer() {
     def isSnippet(tree: Tree) = ScriptNames.isSnippetPackage(tree.symbol.owner)
     override def transform(tree: Tree)(implicit ctx: Context): Tree = tree match {
-      case DefDef(name @ nme.toString_, List(), List(List()), tpt, _) if isSnippet(tree) =>
+      case DefDef(name @ nme.toString_, List(), List(List()), tpt, _) if repl.nonEmpty && isSnippet(tree) =>
         Console println s"Noticed def $name"
         // toString for the line result
-        def stringer(line: TermName, handlers: List[Handler[_]]): Tree = ctx.typer.typed {
+        cpy.DefDef(tree)(name, List(), List(List()), transform(tpt), ctx.typer.typed {
           import untpd._
-          //val name = handlers(0).tree.asInstanceOf[ValOrDefDef].name
-          //val rhs = Apply(Select(Ident(name), "toString".toTermName), Nil)
-          //Literal(Constants.Constant("huh")).withPos(tree.pos)
-          val rhs = Literal(Constants.Constant("nope"))
-              //handlers.head.print
-          DefDef("toString".toTermName, Nil, List(List()), TypeTree(), rhs withPos tree.pos).withMods(Modifiers(Override))
-        }
-        cpy.DefDef(tree)(name, List(), List(List()), transform(tpt), stringer(repl.line, repl.handlers))
+          Console println s"Repl has ${repl.get.handlers.size} handlers"
+          Literal(Constants.Constant(repl.get.handlers.headOption map (_.print) getOrElse "nada")).withPos(tree.pos)
+        })
       case _ => super.transform(tree)
     }
   }
@@ -189,9 +189,11 @@ class Restringer extends TypedAnalysis {
             case other => other
           }).asInstanceOf[List[Tree]].init
           Console println s"OK, template $name with body $body"
-          val handlers = body.init map handlerOf
-          val repl = ReadEvalPrint("".toTermName, handlers)(r => Main.runScript(r)(ctx))
-          tree.pushAttachment(ReplAttachment, repl)
+          if (body.nonEmpty) {
+            val handlers = body.init map handlerOf
+            val repl = ReadEvalPrint("".toTermName, handlers)(r => Main.runScript(r)(ctx))
+            tree.pushAttachment(ReplAttachment, repl)
+          }
           ()
       }
       tree
@@ -261,11 +263,22 @@ trait UntypedAnalysis {
     def name: Name = member.name
   }
   case class ValHandler(tree: ValDef) extends BaseHandler(tree) {
+    /*
     def printed(implicit ctx: Context) =
       joining(text(tree.name.toString + " = "), stringOf(Ident(tree.name)))
+    */
+    def printed(implicit ctx: Context) = {
+      joining(text(tree.name.toString + " = "), stringOf(Ident(tree.name))) withPos tree.pos
+    }
   }
   case class TreeHandler(tree: Tree) extends BaseHandler(tree) {
-    def printed(implicit ctx: Context) = Literal(Constant("any tree"))
+    //def printed(implicit ctx: Context) = Literal(Constant("any tree")).withPos(tree.pos)
+    def printed(implicit ctx: Context) = {
+      Console println s"saw pos ${tree.pos}"
+      val t = Literal(Constant("any tree")).withPos(tree.pos)
+      Console println s"new pos ${t.pos}"
+      t
+    }
   }
 }
 /** Handlers for typed trees. */
@@ -293,10 +306,16 @@ trait TypedAnalysis {
   }
   case class ValHandler(tree: ValDef) extends BaseHandler(tree) {
     def printed(implicit ctx: Context) =
-      joining(text(s"{tree.name.toString}: SOMETHING = "), stringOf(untpd.Ident(tree.name)))
+      joining(text(s"{tree.name.toString}: SOMETHING = "), stringOf(untpd.Ident(tree.name))) withPos tree.pos
   }
   case class TreeHandler(tree: Tree) extends BaseHandler(tree) {
-    def printed(implicit ctx: Context) = Literal(Constant("any tree"))
+    //def printed(implicit ctx: Context) = Literal(Constant("any tree")) withPos tree.pos
+    def printed(implicit ctx: Context) = {
+      Console println s"saw pos ${tree.pos}"
+      val t = Literal(Constant("any tree")).withPos(tree.pos)
+      Console println s"new pos ${t.pos}"
+      t
+    }
   }
 }
 /** A handler for one tree corresponding to user input.
@@ -455,3 +474,15 @@ class Reprinter extends transform.MacroTransform with TypedAnalysis {
 }
 
   */
+        /*
+        def stringer(line: TermName, handlers: List[Handler[_]]): Tree = ctx.typer.typed {
+          import untpd._
+          //val name = handlers(0).tree.asInstanceOf[ValOrDefDef].name
+          //val rhs = Apply(Select(Ident(name), "toString".toTermName), Nil)
+          //Literal(Constants.Constant("huh")).withPos(tree.pos)
+          val rhs = Literal(Constants.Constant("nope"))
+              //handlers.head.print
+          DefDef("toString".toTermName, Nil, List(List()), TypeTree(), rhs withPos tree.pos).withMods(Modifiers(Override))
+        }
+        cpy.DefDef(tree)(name, List(), List(List()), transform(tpt), stringer(repl.line, repl.handlers))
+        */
