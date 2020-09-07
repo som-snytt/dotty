@@ -1,13 +1,15 @@
 package dotty.tools.dotc
 package config
 
-import java.nio.file.{Files, Paths}
-
 import Settings._
 import core.Contexts._
 import Properties._
 
-import scala.collection.JavaConverters._
+import scala.PartialFunction.cond
+import scala.jdk.CollectionConverters._
+import scala.util.chaining._
+
+import java.nio.file.{Files, Paths}
 
 object CompilerCommand {
 
@@ -66,12 +68,24 @@ object CompilerCommand {
    */
   def checkUsage(summary: ArgsSummary, sourcesRequired: Boolean)(using Context): List[String] = {
     val settings = ctx.settings
+    extension [T](setting: Setting[T]):
+      def isStandard: Boolean = !isVerbose && !isWarning && !isAdvanced && !isPrivate || setting.name == "-Werror" || setting.name == "-Wconf"
+      def isVerbose: Boolean  = setting.name.startsWith("-V") && setting.name != "-V"
+      def isWarning: Boolean  = setting.name.startsWith("-W") && setting.name != "-W" || setting.name == "-Xlint"
+      def isAdvanced: Boolean = setting.name.startsWith("-X") && setting.name != "-X"
+      def isPrivate: Boolean  = setting.name.startsWith("-Y") && setting.name != "-Y"
+      def shortHelp: String   = setting.description.linesIterator.next()
+      def isHelping(using Context): Boolean =
+        cond(setting.value) {
+          case ss: List[?] if setting.isMultivalue => ss.contains("help")
+          case s: String                           => "help" == s
+        }
 
     /** Creates a help message for a subset of options based on cond */
     def availableOptionsMsg(cond: Setting[?] => Boolean): String = {
-      val ss                  = (ctx.settings.allSettings filter cond).toList sortBy (_.name)
-      val width               = (ss map (_.name.length)).max
-      def format(s: String)   = ("%-" + width + "s") format s
+      val ss                  = settings.allSettings.filter(cond).toList.sortBy(_.name)
+      val width               = ss.map(_.name.length).max
+      def format(s: String)   = s"%-${width}s".format(s)
       def helpStr(s: Setting[?]) = {
         def defaultValue = s.default match {
           case _: Int | _: String => s.default.toString
@@ -86,33 +100,32 @@ object CompilerCommand {
             s"\n${format("")} $name: $value."
           else
             ""
-        s"${format(s.name)} ${s.description}${formatSetting("Default", defaultValue)}${formatSetting("Choices", s.legalChoices)}"
+        s"${format(s.name)} ${s.shortHelp}${formatSetting("Default", defaultValue)}${formatSetting("Choices", s.legalChoices)}"
       }
-      ss map helpStr mkString "\n"
+      ss.map(helpStr).mkString("\n")
     }
 
-    def createUsageMsg(label: String, shouldExplain: Boolean, cond: Setting[?] => Boolean): String = {
+    def createUsageMsg(label: String, explain: Boolean = true)(cond: Setting[?] => Boolean): String = {
       val prefix = List(
         Some(shortUsage),
-        Some(explainAdvanced) filter (_ => shouldExplain),
+        Some(explainAdvanced).filter(_ => explain),
         Some(label + " options include:")
       ).flatten mkString "\n"
 
       prefix + "\n" + availableOptionsMsg(cond)
     }
 
-    def isStandard(s: Setting[?]): Boolean = !isAdvanced(s) && !isPrivate(s)
-    def isAdvanced(s: Setting[?]): Boolean = s.name.startsWith("-X") && s.name != "-X"
-    def isPrivate(s: Setting[?]) : Boolean = s.name.startsWith("-Y") && s.name != "-Y"
-
-    /** Messages explaining usage and options */
-    def usageMessage    = createUsageMsg("where possible standard", shouldExplain = false, isStandard)
-    def xusageMessage   = createUsageMsg("Possible advanced", shouldExplain = true, isAdvanced)
-    def yusageMessage   = createUsageMsg("Possible private", shouldExplain = true, isPrivate)
+    /** Messages explaining usage and options. */
+    def usageMessage  = createUsageMsg("Standard", explain = false)(_.isStandard)
+    def vusageMessage = createUsageMsg("Verbose")(_.isVerbose)
+    def wusageMessage = createUsageMsg("Warnings")(_.isWarning)
+    def xusageMessage = createUsageMsg("Available advanced")(_.isAdvanced)
+    def yusageMessage = createUsageMsg("Available private")(_.isPrivate)
 
     def shouldStopWithInfo = {
       import settings._
-      Set(help, Xhelp, Yhelp, showPlugins, XshowPhases) exists (_.value)
+      val infoSettings = List(help, Vhelp, Whelp, Xhelp, Yhelp, showPlugins, XshowPhases)
+      infoSettings.exists(_.value) || allSettings.exists(_.isHelping)
     }
 
     def phasesMessage: String = {
@@ -125,6 +138,8 @@ object CompilerCommand {
     def infoMessage: String = {
       import settings._
       if (help.value) usageMessage
+      else if (Vhelp.value) vusageMessage
+      else if (Whelp.value) wusageMessage
       else if (Xhelp.value) xusageMessage
       else if (Yhelp.value) yusageMessage
       else if (showPlugins.value) ctx.base.pluginDescriptions
@@ -148,9 +163,7 @@ object CompilerCommand {
       report.echo(infoMessage)
       Nil
     }
-    else {
-      if (sourcesRequired && summary.arguments.isEmpty) report.echo(usageMessage)
-      summary.arguments
-    }
+    else
+      summary.arguments tap (args => if sourcesRequired && args.isEmpty then report.echo(usageMessage))
   }
 }

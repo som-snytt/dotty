@@ -148,6 +148,72 @@ private sealed trait VerboseSettings { settings: ScalaSettings =>
  */
 private sealed trait WarningSettings { settings: ScalaSettings =>
   val Whelp = BooleanSetting("-W", "Print a synopsis of warning options.")
+  val Wconf = MultiStringSetting(
+    "-Wconf",
+    "patterns",
+    default = List("cat=deprecation:ws", "cat=feature:ws", "cat=optimizer:ws"),
+    descr =
+      s"""Configure compiler warnings.
+         |Syntax: -Wconf:<filters>:<action>,<filters>:<action>,...
+         |multiple <filters> are combined with &, i.e., <filter>&...&<filter>
+         |
+         |Note: Run with `-Wconf:any:warning-verbose` to print warnings with their category, site,
+         |and (for deprecations) origin and since-version.
+         |
+         |<filter>
+         |  - Any message: any
+         |
+         |  - Message categories: cat=deprecation, cat=lint, cat=lint-infer-any
+         |    The full list of warning categories is shown at the end of this help text.
+         |
+         |  - Message content: msg=regex
+         |    The regex need only match some part of the message, not all of it.
+         |
+         |  - Site where the warning is triggered: site=my\\.package\\..*
+         |    The regex must match the full name (`package.Class.method`) of the warning position.
+         |
+         |  - Source file name: src=src_managed/.*
+         |    If `-rootdir` is specified, the regex must match the canonical path relative to the
+         |    root directory. Otherwise, the regex must match the canonical path relative to any
+         |    path segment (`b/.*Test.scala` matches `/a/b/XTest.scala` but not `/ab/Test.scala`).
+         |    Use unix-style paths, separated by `/`.
+         |
+         |  - Origin of deprecation: origin=external\\.package\\..*
+         |    The regex must match the full name (`package.Class.method`) of the deprecated entity.
+         |
+         |  - Since of deprecation: since<1.24
+         |    Valid operators: <, =, >, valid versions: N, N.M, N.M.P. Compares against the first
+         |    version of the form N, N.M or N.M.P found in the `since` parameter of the deprecation,
+         |    for example `1.2.3` in `@deprecated("", "some lib 1.2.3-foo")`.
+         |
+         |<action>
+         |  - error / e
+         |  - warning / w
+         |  - warning-summary / ws (summary with the number of warnings, like for deprecations)
+         |  - warning-verbose / wv (show warning category and site)
+         |  - info / i             (infos are not counted as warnings and don't affect `-Werror`)
+         |  - info-summary / is
+         |  - info-verbose / iv
+         |  - silent / s
+         |
+         |The default configuration summarizes deprecations, feature warnings, and warnings from the optimizer:
+         |  -Wconf:cat=deprecation:ws,cat=feature:ws,cat=optimizer:ws
+         |
+         |User-defined configurations are added to the left. The leftmost rule matching
+         |a warning message defines the action.
+         |
+         |Examples:
+         |  - change every warning into an error: -Wconf:any:error
+         |  - silence certain deprecations: -Wconf:origin=some\\.lib\\..*&since>2.2:s
+         |
+         |Full list of message categories:
+         |TODO$${WarningCategory.all.keys.groupBy(_.split('-').head).toList.sortBy(_._1).map(_._2.toList.sorted.mkString(", ")).mkString(" - ", "\n - ", "")}
+         |
+         |To suppress warnings locally, use the `scala.annotation.nowarn` annotation.
+         |
+         |Note: on the command-line you might need to quote configurations containing `*` or `&`
+         |to prevent the shell from expanding patterns.""".stripMargin,
+  )
 }
 
 /** -X "Extended" or "Advanced" settings

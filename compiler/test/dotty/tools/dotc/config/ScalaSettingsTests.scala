@@ -51,4 +51,18 @@ class ScalaSettingsTests:
     assertTrue("Has the feature", set.contains("implicitConversions"))
     assertTrue("Has the feature", set.contains("dynamics"))
 
+  @Test def `WConf setting is parsed`: Unit =
+    import reporting.{Action, Diagnostic, NoExplanation}
+    val sets = new ScalaSettings
+    val args = tokenize("-Wconf:cat=deprecation:w,cat=feature:w -Wconf:cat=optimizer:s")
+    val sumy = ArgsSummary(sets.defaultState, args, errors = Nil, warnings = Nil)
+    val proc = sets.processArguments(sumy, processAll = true, skipped = Nil)
+    val conf = sets.Wconf.valueIn(proc.sstate)
+    val sut  = reporting.WConf.fromSettings(conf)
+    val msg  = NoExplanation("There was a problem!")
+    val diag = new Diagnostic.DeprecationWarning(msg, util.NoSourcePosition)
+    assertEquals("Warns deprecation", Action.Warning, sut.action(diag))
+    val feat = new Diagnostic.FeatureWarning(msg, util.NoSourcePosition)
+    assertEquals("Warns feature", Action.Warning, sut.action(feat))
+
 end ScalaSettingsTests
