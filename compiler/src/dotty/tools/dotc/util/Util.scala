@@ -21,5 +21,7 @@ object Util {
     if (length == 0 || x < candidates(0)) -1
     else recur(0, length, initMid)
   }
-
 }
+
+/** Alternative to Option(anyref).getOrElse(alt) without widening result. */
+extension [A <: AnyRef](anyref: A|Null) inline def ?:(alt: => A): A = if anyref != null then anyref.nn else alt

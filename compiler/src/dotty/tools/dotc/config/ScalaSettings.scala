@@ -2,19 +2,26 @@ package dotty.tools.dotc
 package config
 
 import dotty.tools.dotc.core.Contexts._
-import dotty.tools.io.{ Directory, PlainDirectory, AbstractFile }
+import dotty.tools.io.{Directory, PlainDirectory, AbstractFile}
 import PathResolver.Defaults
 import rewrites.Rewrites
-import Settings.Setting
+import Settings.{Setting, SettingGroup}
+import util._
 
-/** Settings shared by compiler and scala3doc */
-trait CommonScalaSettings { self: Settings.SettingGroup =>
-  protected def defaultClasspath: String = sys.env.getOrElse("CLASSPATH", ".")
+/** Settings shared by compiler and scala3doc.
+ *  TODO rename ToolSettings
+ */
+trait CommonScalaSettings extends PluginSettings:
+  self: SettingGroup =>
 
-  /** Path related settings */
-  val bootclasspath: Setting[String] = PathSetting("-bootclasspath", "Override location of bootstrap class files.", Defaults.scalaBootClassPath) withAbbreviation "--boot-class-path"
-  val extdirs: Setting[String] = PathSetting("-extdirs", "Override location of installed extensions.", Defaults.scalaExtDirs) withAbbreviation "--extension-directories"
-  val javabootclasspath: Setting[String] = PathSetting("-javabootclasspath", "Override java boot classpath.", Defaults.javaBootClassPath) withAbbreviation "--java-boot-class-path"
+  protected def defaultClasspath = System.getenv("CLASSPATH") ?: "."
+
+  /* Path related settings */
+  val bootclasspath =
+    PathSetting("-bootclasspath", "Override location of bootstrap class files.", Defaults.scalaBootClassPath) withAbbreviation "--boot-class-path"
+  val extdirs =
+    PathSetting("-extdirs", "Override location of installed extensions.", Defaults.scalaExtDirs) withAbbreviation "--extension-directories"
+  val javabootclasspath = PathSetting("-javabootclasspath", "Override java boot classpath.", Defaults.javaBootClassPath) withAbbreviation "--java-boot-class-path"
   val javaextdirs: Setting[String] = PathSetting("-javaextdirs", "Override java extdirs classpath.", Defaults.javaExtDirs) withAbbreviation "--java-extension-directories"
   val sourcepath: Setting[String] = PathSetting("-sourcepath", "Specify location(s) of source files.", Defaults.scalaSourcePath) withAbbreviation "--source-path"
   val sourceroot: Setting[String] = PathSetting("-sourceroot", "Specify workspace root directory.", ".")
@@ -29,17 +36,9 @@ trait CommonScalaSettings { self: Settings.SettingGroup =>
   val pageWidth: Setting[Int] = IntSetting("-pagewidth", "Set page width", 80) withAbbreviation "--page-width"
   val silentWarnings: Setting[Boolean] = BooleanSetting("-nowarn", "Silence all warnings.") withAbbreviation "--no-warnings"
 
-  /** Other settings */
+  /* Other settings */
   val encoding: Setting[String] = StringSetting("-encoding", "encoding", "Specify character encoding used by source files.", Properties.sourceEncoding) withAbbreviation "--encoding"
   val usejavacp: Setting[Boolean] = BooleanSetting("-usejavacp", "Utilize the java.class.path in classpath resolution.") withAbbreviation "--use-java-class-path"
-
-  /** Plugin-related setting */
-  val plugin: Setting[List[String]]             = MultiStringSetting  ("-Xplugin", "paths", "Load a plugin from each classpath.")
-  val disable: Setting[List[String]]            = MultiStringSetting  ("-Xplugin-disable", "plugin", "Disable plugins by name.")
-  val require: Setting[List[String]]            = MultiStringSetting  ("-Xplugin-require", "plugin", "Abort if a named plugin is not loaded.")
-  val showPlugins: Setting[Boolean]        = BooleanSetting      ("-Xplugin-list", "Print a synopsis of loaded plugins.")
-  val pluginsDir: Setting[String]         = StringSetting       ("-Xpluginsdir", "path", "Path to search for plugin archives.", Defaults.scalaPluginPath)
-  val pluginOptions: Setting[List[String]]      = MultiStringSetting  ("-P", "plugin:opt", "Pass an option to a plugin, e.g. -P:<plugin>:<opt>")
 
    /** Doctool specific settings */
   val siteRoot: Setting[String] = StringSetting(
@@ -70,13 +69,14 @@ trait CommonScalaSettings { self: Settings.SettingGroup =>
     "The file that contains the project's logo (in /images).",
     ""
   )
-}
+end CommonScalaSettings
 
-class ScalaSettings extends Settings.SettingGroup with CommonScalaSettings {
+class ScalaSettings extends SettingGroup with CommonScalaSettings, VerboseSettings, WarningSettings, XSettings, YSettings {
   /** Path related settings */
   val semanticdbTarget: Setting[String] = PathSetting("-semanticdb-target", "Specify an alternative output directory for SemanticDB files.", "")
 
-  val deprecation: Setting[Boolean] = BooleanSetting("-deprecation", "Emit warning and location for usages of deprecated APIs.") withAbbreviation "--deprecation"
+  val deprecation = BooleanSetting("-deprecation", "Emit warning and location for usages of deprecated APIs.") withAbbreviation "--deprecation"
+
   val explainTypes: Setting[Boolean] = BooleanSetting("-explain-types", "Explain type errors in more detail.") withAbbreviation "--explain-types"
   val explain: Setting[Boolean] = BooleanSetting("-explain", "Explain errors in more detail.") withAbbreviation "--explain"
   val feature: Setting[Boolean] = BooleanSetting("-feature", "Emit warning and location for usages of features that should be imported explicitly.") withAbbreviation "--feature"
@@ -96,21 +96,69 @@ class ScalaSettings extends Settings.SettingGroup with CommonScalaSettings {
   val noindent: Setting[Boolean] = BooleanSetting("-noindent", "Require classical {...} syntax, indentation is not significant.")
   val YindentColons: Setting[Boolean] = BooleanSetting("-Yindent-colons", "Allow colons at ends-of-lines to start indentation blocks.")
 
-  /** Decompiler settings */
+  /* Decompiler settings */
   val printTasty: Setting[Boolean] = BooleanSetting("-print-tasty", "Prints the raw tasty.") withAbbreviation "--print-tasty"
   val printLines: Setting[Boolean] = BooleanSetting("-print-lines", "Show source code line numbers.") withAbbreviation "--print-lines"
 
-  /** Scala.js-related settings */
+  /* Scala.js-related settings */
   val scalajsGenStaticForwardersForNonTopLevelObjects: Setting[Boolean] = BooleanSetting("-scalajs-genStaticForwardersForNonTopLevelObjects", "Generate static forwarders even for non-top-level objects (Scala.js only)")
   val scalajsMapSourceURI: Setting[List[String]] = MultiStringSetting("-scalajs-mapSourceURI", "uri1[->uri2]", "rebases source URIs from uri1 to uri2 (or to a relative URI) for source maps (Scala.js only)")
 
-  /** -X "Advanced" settings */
-  val Xhelp: Setting[Boolean] = BooleanSetting("-X", "Print a synopsis of advanced options.")
+  /** Dottydoc specific settings that are not used in scala3doc */
+  val docSnapshot: Setting[Boolean] = BooleanSetting("-doc-snapshot", "Generate a documentation snapshot for the current Dotty version")
+
+  val projectUrl: Setting[String] = StringSetting (
+    "-project-url",
+    "project repository homepage",
+    "The source repository of your project.",
+    ""
+  )
+
+  val wikiSyntax: Setting[Boolean] = BooleanSetting("-Xwiki-syntax", "Retains the Scala2 behavior of using Wiki Syntax in Scaladoc.")
+}
+
+/** -P "plugin" settings.
+ *
+ *  Various tools might support plugins.
+ */
+private sealed trait PluginSettings:
+  self: SettingGroup =>
+  val pluginOptions =
+    MultiStringSetting("-P", "plugin:opt", "Pass an option to a plugin, e.g. -P:<plugin>:<opt>")
+  val plugin =
+    MultiStringSetting("-Xplugin", "paths", "Load a plugin from each classpath.")
+  val disable =
+    MultiStringSetting("-Xplugin-disable", "plugin", "Disable plugins by name.")
+  val require =
+    MultiStringSetting("-Xplugin-require", "plugin", "Abort if a named plugin is not loaded.")
+  val showPlugins =
+    BooleanSetting    ("-Xplugin-list", "Print a synopsis of loaded plugins.")
+  val pluginsDir =
+    StringSetting     ("-Xpluginsdir", "path", "Path to search for plugin archives.", Defaults.scalaPluginPath)
+end PluginSettings
+
+/** -V "Verbose" settings
+ */
+private sealed trait VerboseSettings { settings: ScalaSettings =>
+  val Vhelp = BooleanSetting("-V", "Print a synopsis of verbose options.")
+  val Xprint = PhasesSetting("-Vprint", "Print out program after").withAbbreviation("-Xprint")
+}
+
+/** -W "Warnings" settings
+ */
+private sealed trait WarningSettings { settings: ScalaSettings =>
+  val Whelp = BooleanSetting("-W", "Print a synopsis of warning options.")
+}
+
+/** -X "Extended" or "Advanced" settings
+ */
+private sealed trait XSettings { settings: ScalaSettings =>
+  val Xhelp = BooleanSetting("-X", "Print a synopsis of advanced options.")
+
   val XnoForwarders: Setting[Boolean] = BooleanSetting("-Xno-forwarders", "Do not generate static forwarders in mirror classes.")
   val XmaxInlines: Setting[Int] = IntSetting("-Xmax-inlines", "Maximal number of successive inlines.", 32)
   val XmaxInlinedTrees: Setting[Int] = IntSetting("-Xmax-inlined-trees", "Maximal number of inlined trees.", 2_000_000)
   val Xmigration: Setting[ScalaVersion] = VersionSetting("-Xmigration", "Warn about constructs whose behavior may have changed since version.")
-  val Xprint: Setting[List[String]] = PhasesSetting("-Xprint", "Print out program after")
   val XprintTypes: Setting[Boolean] = BooleanSetting("-Xprint-types", "Print tree types (debugging option).")
   val XprintDiff: Setting[Boolean] = BooleanSetting("-Xprint-diff", "Print changed parts of the tree since last print.")
   val XprintDiffDel: Setting[Boolean] = BooleanSetting("-Xprint-diff-del", "Print changed parts of the tree since last print including deleted parts.")
@@ -137,10 +185,16 @@ class ScalaSettings extends Settings.SettingGroup with CommonScalaSettings {
     def isTruthy(using Context) = XmixinForceForwarders.value == "true"
     def isAtLeastJunit(using Context) = isTruthy || XmixinForceForwarders.value == "junit"
   }
+}
 
-  /** -Y "Private" settings */
+/** -Y "Forking" as in forked tongue or "Private" settings
+ */
+private sealed trait YSettings:
+  settings: ScalaSettings =>
+
+  val Yhelp = BooleanSetting("-Y", "Print a synopsis of private options.")
+
   val YoverrideVars: Setting[Boolean] = BooleanSetting("-Yoverride-vars", "Allow vars to be overridden.")
-  val Yhelp: Setting[Boolean] = BooleanSetting("-Y", "Print a synopsis of private options.")
   val Ycheck: Setting[List[String]] = PhasesSetting("-Ycheck", "Check the tree at the end of")
   val YcheckMods: Setting[Boolean] = BooleanSetting("-Ycheck-mods", "Check that symbols and their defining trees have modifiers in sync.")
   val Ydebug: Setting[Boolean] = BooleanSetting("-Ydebug", "Increase the quantity of debugging output.")
@@ -219,16 +273,4 @@ class ScalaSettings extends Settings.SettingGroup with CommonScalaSettings {
 
   val Yinstrument: Setting[Boolean] = BooleanSetting("-Yinstrument", "Add instrumentation code that counts allocations and closure creations.")
   val YinstrumentDefs: Setting[Boolean] = BooleanSetting("-Yinstrument-defs", "Add instrumentation code that counts method calls; needs -Yinstrument to be set, too.")
-
-  /** Dottydoc specific settings that are not used in scala3doc */
-  val docSnapshot: Setting[Boolean] = BooleanSetting("-doc-snapshot", "Generate a documentation snapshot for the current Dotty version")
-
-  val projectUrl: Setting[String] = StringSetting (
-    "-project-url",
-    "project repository homepage",
-    "The source repository of your project.",
-    ""
-  )
-
-  val wikiSyntax: Setting[Boolean] = BooleanSetting("-Xwiki-syntax", "Retains the Scala2 behavior of using Wiki Syntax in Scaladoc.")
-}
+end YSettings
