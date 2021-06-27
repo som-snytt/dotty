@@ -1270,7 +1270,9 @@ object Parsers {
     def possibleTemplateStart(isNew: Boolean = false): Unit =
       in.observeColonEOL()
       if in.token == COLONEOL then
-        if in.lookahead.token == END then in.token = NEWLINE
+        if in.lookahead.token == END then
+          deprecationWarning("expected indented definitions after colon, found an empty template with mandatory end marker")
+          in.token = NEWLINE
         else
           in.nextToken()
           if in.token != INDENT && in.token != LBRACE then
