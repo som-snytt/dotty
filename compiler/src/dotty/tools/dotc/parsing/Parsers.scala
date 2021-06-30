@@ -5,6 +5,7 @@ package parsing
 import scala.annotation.internal.sharable
 import scala.collection.mutable.ListBuffer
 import scala.collection.immutable.BitSet
+import scala.util.matching.Regex
 import util.{ SourceFile, SourcePosition, NoSourcePosition }
 import Tokens._
 import Scanners._
@@ -630,6 +631,14 @@ object Parsers {
       str.isEmpty ||
       testChar(from, str.head) && testChars(from + 1, str.tail)
 
+    class charSeqAt(from: Int, to: Int) extends CharSequence {
+      override def charAt(i: Int) = source.content()(from + i)
+      override def length() = to - from
+      override def subSequence(from1: Int, to1: Int) = charSeqAt(from + from1, from + to1)
+      override def toString() = 0.until(length()).map(charAt).mkString
+    }
+    def testRegex(from: Int, r: Regex): Option[Regex.Match] = r.findPrefixMatchOf(charSeqAt(from, source.length))
+
     def skipBlanks(idx: Int, step: Int = 1): Int =
       if (testChar(idx, c => c == ' ' || c == '\t' || c == Chars.CR)) skipBlanks(idx + step, step)
       else idx
@@ -763,7 +772,21 @@ object Parsers {
           else ":"
         val (startClosing, endClosing) = closingElimRegion()
         patch(source, Span(startOpening, endOpening), openingPatchStr)
-        patch(source, Span(startClosing, endClosing), "")
+        var patched = false
+        if testChars(endClosing, "//") then
+          val maybeEnd = skipBlanks(endClosing + 2)
+          if testChars(maybeEnd, "end ") then
+            val r = raw"(.*)\R".r
+            testRegex(maybeEnd + 4, r) match {
+              case Some(m) =>
+                val s = m.group(1).trim
+                if !s.exists(_.isWhitespace) then
+                  patch(source, Span(startClosing, maybeEnd + 4 + s.length), s"end $s")
+                  patched = true
+              case _ =>
+            }
+        end if
+        if !patched then patch(source, Span(startClosing, endClosing), "")
       }
       t
     }
