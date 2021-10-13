@@ -218,6 +218,13 @@ private sealed trait XSettings:
   val XcheckMacros: Setting[Boolean] = BooleanSetting("-Xcheck-macros", "Check some invariants of macro generated code while expanding macros", aliases = List("--Xcheck-macros"))
   val XmainClass: Setting[String] = StringSetting("-Xmain-class", "path", "Class for manifest's Main-Class entry (only useful with -d <jar>)", "")
 
+  val Xlint: Setting[List[String]] = MultiChoiceSetting(
+    name    = "-Xlint",
+    helpArg = "lint",
+    descr   = "Enable recommended warnings",
+    choices = List("deprecation"),
+    default = "true" :: Nil)
+
   val XmixinForceForwarders = ChoiceSetting(
     name    = "-Xmixin-force-forwarders",
     helpArg = "mode",
