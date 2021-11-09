@@ -7,15 +7,18 @@ import reporting.StoreReporter
 import vulpix.TestConfiguration
 
 import core.Contexts.{Context, ContextBase}
-import dotty.tools.dotc.config.Settings._
+import dotty.tools.Useables.given
+import dotty.tools.dotc.config.Settings.*
 import dotty.tools.vulpix.TestConfiguration.mkClasspath
 
-import java.nio.file._
+import java.nio.file.*, Files.*
 
 import org.junit.Test
-import org.junit.Assert._
+import org.junit.Assert.{assertEquals, assertFalse, assertTrue}
 
-class SettingsTests {
+import scala.util.Using
+
+class SettingsTests:
 
   @Test def missingOutputDir: Unit =
     val options = Array("-d", "not_here")
@@ -25,9 +28,9 @@ class SettingsTests {
 
   @Test def jarOutput: Unit =
     val source = "tests/pos/Foo.scala"
-    val out = Paths.get("out/jaredFoo.jar").normalize
-    if (Files.exists(out)) Files.delete(out)
-    val options = Array("-classpath", TestConfiguration.basicClasspath, "-d", out.toString, source)
+    val out = Paths.get("out/jarredFoo.jar").normalize
+    if Files.exists(out) then Files.delete(out)
+    val options = Array("-Xmain-class", "Jarred", "-classpath", TestConfiguration.basicClasspath, "-d", out.toString, source)
     val reporter = Main.process(options)
     assertEquals(0, reporter.errorCount)
     assertTrue(Files.exists(out))
@@ -47,7 +50,7 @@ class SettingsTests {
       val bar = IntSetting("-bar", "Bar", 0)
 
     val args = List("-foo", "b", "-bar", "1")
-    val summary = Settings.processArguments(args, true)
+    val summary = Settings.processArguments(args, processAll = true)
     assertTrue(summary.errors.isEmpty)
     withProcessedArgs(summary) {
       assertEquals("b", Settings.foo.value)
@@ -72,17 +75,17 @@ class SettingsTests {
 
   @Test def `dont crash on many options`: Unit =
     object Settings extends SettingGroup:
-      val option = BooleanSetting("-option", "Some option")
+      val option = StringSetting("-option", "opt", "Some option", "zero")
 
     val limit = 6000
-    val args = List.fill(limit)("-option")
+    val args = List.tabulate(limit)(i => if i % 2 == 0 then "-option" else i.toString)
     val summary = Settings.processArguments(args, processAll = true)
     assertTrue(summary.errors.isEmpty)
-    assertEquals(limit-1, summary.warnings.size)
-    assertTrue(summary.warnings.head.contains("repeatedly"))
+    assertEquals(limit/2 - 1, summary.warnings.size)          // should warn on all but first
+    assertTrue(summary.warnings.head.contains("was updated"))
     assertEquals(0, summary.arguments.size)
     withProcessedArgs(summary) {
-      assertTrue(Settings.option.value)
+      assertEquals("5999", Settings.option.value.toString)
     }
 
   @Test def `bad option warning consumes an arg`: Unit =
@@ -106,7 +109,7 @@ class SettingsTests {
         false
 
     val default = Settings.defaultState
-    dotty.tools.assertThrows[IllegalArgumentException](checkMessage("found: not an option of type java.lang.String, required: Boolean")) {
+    assertThrows[IllegalArgumentException](checkMessage("found: not an option of type java.lang.String, required: Boolean")) {
       Settings.option.updateIn(default, "not an option")
     }
 
@@ -166,21 +169,86 @@ class SettingsTests {
       )
       assertEquals(expectedErrors, summary.errors)
     }
+  end validateChoices
 
   @Test def `Allow IntSetting's to be set with a colon`: Unit =
     object Settings extends SettingGroup:
       val foo = IntSetting("-foo", "foo", 80)
     import Settings._
 
-    val args = List("-foo:100")
-    val summary = processArguments(args, processAll = true)
-    assertTrue(s"Setting args errors:\n  ${summary.errors.take(5).mkString("\n  ")}", summary.errors.isEmpty)
-    withProcessedArgs(summary) {
-      assertEquals(100, foo.value)
+    def check(args: List[String]) = {
+      val summary = processArguments(args, processAll = true)
+      assertTrue(s"Setting args errors:\n  ${summary.errors.take(5).mkString("\n  ")}", summary.errors.isEmpty)
+      withProcessedArgs(summary) {
+        assertEquals(100, foo.value)
+      }
+    }
+    check(List("-foo:100"))
+    check(List("-foo", "100"))
+    assertThrows[AssertionError](_.getMessage.contains("missing argument for option -foo"))(check(List("-foo")))
+
+  @Test def `option sanity checking`: Unit =
+    object Settings extends SettingGroup:
+      val option = BooleanSetting("-option", "Some option")
+    val args = List("-option", "-option")
+    val summary = Settings.processArguments(args, processAll = true)
+    assertTrue("Multiple options is not an error", summary.errors.isEmpty)
+    assertTrue("Multiple options is not a warning if consistent", summary.warnings.isEmpty)
+
+  @Test def `boolean option sanity checking`: Unit =
+    object Settings extends SettingGroup:
+      val option = BooleanSetting("-option", "Some option")
+    val args = List("-option", "-option:false")
+    val summary = Settings.processArguments(args, processAll = true)
+    assertTrue("Multiple options is not an error", summary.errors.isEmpty)
+    assertFalse("Multiple conflicting options is a warning", summary.warnings.isEmpty)
+    assertTrue(summary.warnings.forall(_.contains("flipped")))
+
+  @Test def `string option may be consistent`: Unit =
+    object Settings extends SettingGroup:
+      val option = StringSetting("-option", "opt", "Some option", "none")
+    val args = List("-option:something", "-option:something")
+    val summary = Settings.processArguments(args, processAll = true)
+    assertTrue("Multiple options is not an error", summary.errors.isEmpty)
+    assertTrue("Multiple consistent options is not a warning", summary.warnings.isEmpty)
+
+  @Test def `string option must be consistent`: Unit =
+    object Settings extends SettingGroup:
+      val option = StringSetting("-option", "opt", "Some option", "none")
+    val args = List("-option:something", "-option:nothing")
+    val summary = Settings.processArguments(args, processAll = true)
+    assertTrue("Multiple options is not an error", summary.errors.isEmpty)
+    assertFalse("Multiple conflicting options is a warning", summary.warnings.isEmpty)
+    assertTrue(summary.warnings.forall(_.contains("updated")))
+
+  @Test def `int option also warns`: Unit =
+    object Settings extends SettingGroup:
+      val option = IntSetting("-option", "Some option", 42)
+    val args = List("-option:17", "-option:27")
+    val summary = Settings.processArguments(args, processAll = true)
+    assertTrue("Multiple options is not an error", summary.errors.isEmpty)
+    assertFalse("Multiple conflicting options is a warning", summary.warnings.isEmpty)
+    assertTrue(summary.warnings.forall(_.contains("updated")))
+
+  @Test def `dir option also warns`: Unit =
+    import java.nio.file.Paths
+    import io.PlainFile, PlainFile.*
+    val abc: PlainFile = Paths.get("a", "b", "c").toPlainFile
+    object Settings extends SettingGroup:
+      val option = OutputSetting("-option", "out", "A file", Paths.get("a", "b", "c").toPlainFile)
+    Using.resource(createTempDirectory("i13887")) { dir =>
+      val target = createDirectory(dir.resolve("x"))
+      val mistake = createDirectory(dir.resolve("y"))
+      val args = List("-option", target.toString, "-option", mistake.toString)
+      val summary = Settings.processArguments(args, processAll = true)
+      assertTrue("Multiple options is not an error", summary.errors.isEmpty)
+      assertFalse("Multiple conflicting options is a warning", summary.warnings.isEmpty)
+      assertTrue(summary.warnings.forall(_.contains("updated")))
     }
 
+  // use the supplied summary for evaluating settings
   private def withProcessedArgs(summary: ArgsSummary)(f: SettingsState ?=> Unit) = f(using summary.sstate)
 
+  // evaluate a setting using only a SettingsState (instead of a full-blown Context)
   extension [T](setting: Setting[T])
     private def value(using ss: SettingsState): T = setting.valueIn(ss)
-}

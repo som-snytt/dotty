@@ -123,7 +123,7 @@ trait CliCommand:
    */
   def checkUsage(summary: ArgsSummary, sourcesRequired: Boolean)(using settings: ConcreteSettings)(using SettingsState, Context): Option[List[String]] =
     // Print all warnings encountered during arguments parsing
-    summary.warnings.foreach(report.warning(_))
+    summary.warnings.foreach(report.configurationWarning(_))
 
     if summary.errors.nonEmpty then
       summary.errors foreach (report.error(_))

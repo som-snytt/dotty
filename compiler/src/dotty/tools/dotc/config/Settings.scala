@@ -39,18 +39,12 @@ object Settings:
         this
   end SettingsState
 
-  case class ArgsSummary(
-    sstate: SettingsState,
-    arguments: List[String],
-    errors: List[String],
-    warnings: List[String]) {
+  case class ArgsSummary(sstate: SettingsState, arguments: List[String], errors: List[String], warnings: List[String])
 
-    def fail(msg: String): Settings.ArgsSummary =
-      ArgsSummary(sstate, arguments.tail, errors :+ msg, warnings)
-
-    def warn(msg: String): Settings.ArgsSummary =
-      ArgsSummary(sstate, arguments.tail, errors, warnings :+ msg)
-  }
+  extension (summary: ArgsSummary)
+    def fail(msg: String): ArgsSummary = summary.copy(errors = summary.errors :+ msg)
+    def warn(msg: String): ArgsSummary = summary.copy(warnings = summary.warnings :+ msg)
+    def skip(): ArgsSummary = summary.copy(arguments = summary.arguments.drop(1))
 
   case class Setting[T: ClassTag] private[Settings] (
     name: String,
@@ -73,7 +67,7 @@ object Settings:
 
     def isDefaultIn(state: SettingsState): Boolean = valueIn(state) == default
 
-    def isMultivalue: Boolean = implicitly[ClassTag[T]] == ListTag
+    def isMultivalue: Boolean = summon[ClassTag[T]] == ListTag
 
     def legalChoices: String =
       choices match {
@@ -86,91 +80,96 @@ object Settings:
     def tryToSet(state: ArgsSummary): ArgsSummary = {
       val ArgsSummary(sstate, arg :: args, errors, warnings) = state: @unchecked
       def update(value: Any, args: List[String]): ArgsSummary =
-        var dangers = warnings
         val value1 =
-          if changed && isMultivalue then
-            val value0  = value.asInstanceOf[List[String]]
-            val current = valueIn(sstate).asInstanceOf[List[String]]
-            value0.filter(current.contains).foreach(s => dangers :+= s"Setting $name set to $s redundantly")
-            current ++ value0
-          else
-            if changed then dangers :+= s"Flag $name set repeatedly"
-            value
+          if isMultivalue then valueIn(sstate).asInstanceOf[List[String]] ++ value.asInstanceOf[List[String]]
+          else value
         changed = true
-        ArgsSummary(updateIn(sstate, value1), args, errors, dangers)
-      end update
+        ArgsSummary(updateIn(sstate, value1), args, errors, warnings)
 
-      def fail(msg: String, args: List[String]) =
-        ArgsSummary(sstate, args, errors :+ msg, warnings)
+      def fail(msg: String, args: List[String]) = ArgsSummary(sstate, args, errors :+ msg, warnings)
 
-      def missingArg =
-        fail(s"missing argument for option $name", args)
+      def missingArg = fail(s"missing argument for option $name", args)
+
+      def setBoolean(argValue: String) =
+        def checkAndSet(v: Boolean) =
+          val dubious = changed && v != valueIn(sstate).asInstanceOf[Boolean]
+          val updated = update(v, args)
+          if dubious then updated.warn(s"Boolean flag $name flipped") else updated
+        if argValue.equalsIgnoreCase("true") || argValue == "" then checkAndSet(true)
+        else if argValue.equalsIgnoreCase("false") then checkAndSet(false)
+        else fail(s"invalid boolean value $argValue", args)
 
       def setString(argValue: String, args: List[String]) =
         choices match
-          case Some(xs) if !xs.contains(argValue) =>
-            fail(s"$argValue is not a valid choice for $name", args)
-          case _ =>
-            update(argValue, args)
+          case Some(xs) if !xs.contains(argValue) => fail(s"$argValue is not a valid choice for $name", args)
+          case _ if changed && argValue != valueIn(sstate).asInstanceOf[String] => update(argValue, args).warn(s"Option $name was updated")
+          case _ => update(argValue, args)
 
       def setInt(argValue: String, args: List[String]) =
         try
           val x = argValue.toInt
           choices match
-            case Some(r: Range) if x < r.head || r.last < x =>
-              fail(s"$argValue is out of legal range ${r.head}..${r.last} for $name", args)
-            case Some(xs) if !xs.contains(x) =>
-              fail(s"$argValue is not a valid choice for $name", args)
-            case _ =>
-              update(x, args)
-        catch case _: NumberFormatException =>
-          fail(s"$argValue is not an integer argument for $name", args)
+            case Some(r: Range) if x < r.head || r.last < x => fail(s"$argValue is out of legal range ${r.head}..${r.last} for $name", args)
+            case Some(xs) if !xs.contains(x)                => fail(s"$argValue is not a valid choice for $name", args)
+            case _                                          =>
+              val dubious = changed && x != valueIn(sstate).asInstanceOf[Int]
+              val updated = update(x, args)
+              if dubious then updated.warn(s"Option $name was updated") else updated
+        catch case _: NumberFormatException => fail(s"$argValue is not an integer argument for $name", args)
 
-      def doSet(argRest: String) = ((implicitly[ClassTag[T]], args): @unchecked) match {
-        case (BooleanTag, _) =>
-          update(true, args)
-        case (OptionTag, _) =>
-          update(Some(propertyClass.get.getConstructor().newInstance()), args)
-        case (ListTag, _) =>
-          if (argRest.isEmpty) missingArg
-          else
-            val strings = argRest.split(",").toList
-            choices match
-              case Some(valid) => strings.filterNot(valid.contains) match
-                case Nil => update(strings, args)
+      def doSet(argRest: String): ArgsSummary = (summon[ClassTag[T]]: @unchecked) match {
+        case BooleanTag => setBoolean(argRest)
+        case OptionTag => update(Some(propertyClass.get.getConstructor().newInstance()), args)
+        case ListTag if argRest.isEmpty => missingArg
+        case ListTag =>
+          val split = argRest.split(",").toList
+          def checkRepeated =
+            var dangers: List[String] = Nil
+            if changed then
+              val current = valueIn(sstate).asInstanceOf[List[String]]
+              split.filter(current.contains).foreach(s => dangers :+= s"Setting $name set to $s redundantly")
+            dangers.foldLeft(update(split, args))((sum, w) => sum.warn(w))
+          choices match
+            case Some(valid) =>
+              split.filterNot(valid.contains) match
+                case Nil => checkRepeated
                 case invalid => fail(s"invalid choice(s) for $name: ${invalid.mkString(",")}", args)
-              case _ => update(strings, args)
-        case (StringTag, _) if argRest.nonEmpty || choices.exists(_.contains("")) =>
-          setString(argRest, args)
-        case (StringTag, arg2 :: args2) =>
-          if (arg2 startsWith "-") missingArg
-          else setString(arg2, args2)
-        case (OutputTag, arg :: args) =>
-          val path = Directory(arg)
-          val isJar = path.extension == "jar"
-          if (!isJar && !path.isDirectory)
-            fail(s"'$arg' does not exist or is not a directory or .jar file", args)
-          else {
-            val output = if (isJar) JarArchive.create(path) else new PlainDirectory(path)
-            update(output, args)
-          }
-        case (IntTag, args) if argRest.nonEmpty =>
-          setInt(argRest, args)
-        case (IntTag, arg2 :: args2) =>
-          setInt(arg2, args2)
-        case (VersionTag, _) =>
+            case _ => checkRepeated
+        case StringTag if argRest.nonEmpty || choices.exists(_.contains("")) => setString(argRest, args)
+        case StringTag =>
+          args match
+            case arg2 :: _ if arg2.startsWith("-") => missingArg
+            case arg2 :: args2 => setString(arg2, args2)
+            case _ => missingArg
+        case OutputTag =>
+          args match
+            case arg :: rest =>
+              val path = Directory(arg)
+              val isJar = path.extension == "jar"
+              if !isJar && !path.isDirectory then fail(s"'$arg' does not exist or is not a directory or .jar file", rest)
+              else
+                val output = if isJar then JarArchive.create(path) else PlainDirectory(path)
+                if changed && output != valueIn(sstate).asInstanceOf[AbstractFile] then update(output, rest).warn(s"Option $name was updated")
+                else update(output, rest)
+            case _ => missingArg
+        case IntTag if argRest.nonEmpty => setInt(argRest, args)
+        case IntTag =>
+          args match
+            case arg :: rest => setInt(arg, rest)
+            case _ => missingArg
+        case VersionTag =>
           ScalaVersion.parse(argRest) match {
             case Success(v) => update(v, args)
-            case Failure(ex) => fail(ex.getMessage, args)
+            case Failure(x) => fail(x.getMessage, args)
           }
-        case (_, Nil) =>
-          missingArg
+        case _ => missingArg
       }
 
       def matches(argName: String) = (name :: aliases).exists(_ == argName)
 
+      // begin
       if (prefix != "" && arg.startsWith(prefix))
-        doSet(arg drop prefix.length)
+        doSet(arg.drop(prefix.length))
       else if (prefix == "" && matches(arg.takeWhile(_ != ':')))
         doSet(arg.dropWhile(_ != ':').drop(1))
       else
@@ -237,7 +236,7 @@ object Settings:
               if state1 ne state then state1
               else loop(settings1)
             case Nil =>
-              state.warn(s"bad option '$x' was ignored")
+              state.warn(s"bad option '$x' was ignored").skip()
           processArguments(loop(allSettings.toList), processAll, skipped)
         case arg :: args =>
           if processAll then processArguments(stateWithArgs(args), processAll, skipped :+ arg)

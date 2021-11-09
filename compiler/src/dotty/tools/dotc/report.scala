@@ -23,6 +23,9 @@ object report:
   private def issueWarning(warning: Warning)(using Context): Unit =
     ctx.reporter.report(warning)
 
+  def configurationWarning(msg: Message, pos: SrcPos = NoSourcePosition)(using Context): Unit =
+    issueWarning(ConfigurationWarning(msg, pos.sourcePos))
+
   def deprecationWarning(msg: Message, pos: SrcPos = NoSourcePosition)(using Context): Unit =
     issueWarning(new DeprecationWarning(msg, pos.sourcePos))
 

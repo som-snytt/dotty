@@ -14,6 +14,7 @@ import scala.util.matching.Regex
 enum MessageFilter:
   def matches(message: Diagnostic): Boolean = this match
     case Any => true
+    case Configuration => message.isInstanceOf[Diagnostic.ConfigurationWarning]
     case Deprecated => message.isInstanceOf[Diagnostic.DeprecationWarning]
     case Feature => message.isInstanceOf[Diagnostic.FeatureWarning]
     case Unchecked => message.isInstanceOf[Diagnostic.UncheckedWarning]
@@ -23,7 +24,7 @@ enum MessageFilter:
     case MessageID(errorId) => message.msg.errorId == errorId
     case None => false
 
-  case Any, Deprecated, Feature, Unchecked, None
+  case Any, Configuration, Deprecated, Feature, Unchecked, None
   case MessagePattern(pattern: Regex)
   case MessageID(errorId: ErrorMessageID)
 
@@ -80,10 +81,11 @@ object WConf:
         catch case _: IllegalArgumentException => Left(s"unknown error message name: $conf")
 
       case "cat" => conf match
-        case "deprecation" => Right(Deprecated)
-        case "feature"     => Right(Feature)
-        case "unchecked"   => Right(Unchecked)
-        case _             => Left(s"unknown category: $conf")
+        case "configuration" => Right(Configuration)
+        case "deprecation"   => Right(Deprecated)
+        case "feature"       => Right(Feature)
+        case "unchecked"     => Right(Unchecked)
+        case _               => Left(s"unknown category: $conf")
       case _ => Left(s"unknown filter: $filter")
     case _ => Left(s"unknown filter: $s")
 

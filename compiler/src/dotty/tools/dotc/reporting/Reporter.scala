@@ -205,14 +205,13 @@ abstract class Reporter extends interfaces.ReporterResult {
     incompleteHandler(dia, ctx)
 
   /** Summary of warnings and errors */
-  def summary: String = {
-    val b = new mutable.ListBuffer[String]
+  def summary: String =
+    val b = mutable.ListBuffer.empty[String]
     if (warningCount > 0)
       b += countString(warningCount, "warning") + " found"
     if (errorCount > 0)
       b += countString(errorCount, "error") + " found"
     b.mkString("\n")
-  }
 
   def summarizeUnreportedWarnings()(using Context): Unit =
     for (settingName, count) <- unreportedWarnings do
@@ -221,10 +220,10 @@ abstract class Reporter extends interfaces.ReporterResult {
       report(Warning(msg, NoSourcePosition))
 
   /** Print the summary of warnings and errors */
-  def printSummary()(using Context): Unit = {
-    val s = summary
-    if (s != "") report(new Info(s, NoSourcePosition))
-  }
+  def printSummary()(using Context): Unit =
+    summary match
+      case "" =>
+      case s  => report(Info(s, NoSourcePosition))
 
   /** Returns a string meaning "n elements". */
   protected def countString(n: Int, elements: String): String = n match {

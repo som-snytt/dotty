@@ -111,6 +111,7 @@ trait CommonScalaSettings:
 
   val javaOutputVersion: Setting[String] = ChoiceSetting("-java-output-version", "version", "Compile code with classes specific to the given version of the Java platform available on the classpath and emit bytecode for this version. Corresponds to -release flag in javac.", ScalaSettings.supportedReleaseVersions, "", aliases = List("-release", "--release"))
 
+  val configuration: Setting[Boolean] = BooleanSetting("-configuration", "Warn about conflicting and redundant tool options", aliases = List("--configuration"))
   val deprecation: Setting[Boolean] = BooleanSetting("-deprecation", "Emit warning and location for usages of deprecated APIs.", aliases = List("--deprecation"))
   val feature: Setting[Boolean] = BooleanSetting("-feature", "Emit warning and location for usages of features that should be imported explicitly.", aliases = List("--feature"))
   val explain: Setting[Boolean] = BooleanSetting("-explain", "Explain errors in more detail.", aliases = List("--explain"))
