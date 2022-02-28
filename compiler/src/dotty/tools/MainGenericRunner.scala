@@ -166,9 +166,8 @@ object MainGenericRunner {
           .withTargetScript(arg)
           .withScriptArgs(tail*)
       else
-        val modalSettings = if arg.startsWith("-") then settings else settings.withPossibleEntryPaths(arg).withModeShouldBePossibleRun
-        val newSettings = modalSettings.withResidualArgs(arg)
-        process(tail, newSettings)
+        val newSettings = if arg.startsWith("-") then settings else settings.withPossibleEntryPaths(arg).withModeShouldBePossibleRun
+        process(tail, newSettings.withResidualArgs(arg))
   end process
       
   def main(args: Array[String]): Unit =
@@ -200,8 +199,7 @@ object MainGenericRunner {
             Option.when(Jar.isJarOrZip(dotty.tools.io.Path(entryPath)))(Jar(entryPath).mainClass).flatten
           }.isDefined
         }
-        val newSettings =
-          targetToRun match
+        val newSettings = targetToRun match
           case Some(fqName) =>
             settings.withTargetToRun(fqName).copy(residualArgs = settings.residualArgs.filterNot(fqName.==)).withExecuteMode(ExecuteMode.Run)
           case None =>
