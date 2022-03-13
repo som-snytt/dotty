@@ -1859,6 +1859,7 @@ object Parsers {
         if in.token == LPAREN then
           var t: Tree = atSpan(in.offset) { Parens(inParens(exprInParens())) }
           if in.token != altToken then
+            println(s"${tokenString(in.token)} != ${tokenString(altToken)}, and cont? ${toBeContinued(altToken)}")
             if toBeContinued(altToken) then
               t = inSepRegion(InCond) {
                 expr1Rest(
