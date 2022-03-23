@@ -1580,7 +1580,7 @@ object Scanners {
     private var myCommasExpected: Boolean = false
 
     inline def withCommasExpected[T](inline op: => T): T =
-      val saved = myCommasExpected
+      assert(!myCommasExpected, "scanning region with commas is not re-entrant")
       myCommasExpected = true
       val res = op
       myCommasExpected = false
