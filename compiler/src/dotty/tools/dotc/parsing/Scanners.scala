@@ -297,8 +297,8 @@ object Scanners {
         token == EOF
         || (currentRegion eq lastRegion)
             && (isStatSep
-                || closingParens.contains(token) && lastRegion.toList.exists(_.closedBy == token)
-                || token == COMMA && lastRegion.toList.exists(_.commasExpected)
+                || closingParens.contains(token) && lastRegion.enclosingExists(_.closedBy == token)
+                || token == COMMA && lastRegion.enclosingExists(_.commasExpected)
                 || token == OUTDENT && indentWidth(offset) < lastKnownIndentWidth)
           // stop at OUTDENT if the new indentwidth is smaller than the indent width of
           // currentRegion. This corrects for the problem that sometimes we don't see an INDENT
@@ -309,7 +309,7 @@ object Scanners {
         nextToken()
       if debugTokenStream then
         println(s"\nSTOP SKIP AT ${sourcePos().line + 1}, $this in $currentRegion")
-      if token == OUTDENT then dropUntil(_.isInstanceOf[Indented])
+      if token == OUTDENT then currentRegion = currentRegion.enclosingWhere(_.isInstanceOf[Indented])
       skipping = false
 
 // Get next token ------------------------------------------------------------
@@ -341,17 +341,13 @@ object Scanners {
       nextToken()
       result
 
-    private inline def dropUntil(inline matches: Region => Boolean): Unit =
-      while !matches(currentRegion) && !currentRegion.isOutermost do
-        currentRegion = currentRegion.enclosing
-
     def adjustSepRegions(lastToken: Token): Unit = (lastToken: @switch) match {
       case LPAREN | LBRACKET =>
         currentRegion = InParens(lastToken, currentRegion)
       case LBRACE =>
         currentRegion = InBraces(currentRegion)
       case RBRACE =>
-        dropUntil(_.isInstanceOf[InBraces])
+        currentRegion = currentRegion.enclosingWhere(_.isInstanceOf[InBraces])
         if !currentRegion.isOutermost then currentRegion = currentRegion.enclosing
       case RPAREN | RBRACKET =>
         currentRegion match {
@@ -1580,7 +1576,6 @@ object Scanners {
     private var myCommasExpected: Boolean = false
 
     inline def withCommasExpected[T](inline op: => T): T =
-      val saved = myCommasExpected
       myCommasExpected = true
       val res = op
       myCommasExpected = false
@@ -1590,6 +1585,14 @@ object Scanners {
 
     def toList: List[Region] =
       this :: (if outer == null then Nil else outer.toList)
+
+    def enclosingExists(p: Region => Boolean): Boolean =
+      @tailrec def loop(r: Region): Boolean = p(r) || !r.isOutermost && loop(r.outer)
+      loop(this)
+
+    inline def enclosingWhere(inline p: Region => Boolean): Region =
+      @tailrec def loop(r: Region): Region = if (p(r) || r.isOutermost) r else loop(r.outer)
+      loop(this)
 
     private def delimiter = this match
       case _: InString => "}(in string)"
