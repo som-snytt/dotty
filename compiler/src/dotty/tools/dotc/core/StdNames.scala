@@ -203,6 +203,7 @@ object StdNames {
     final val Product: N             = "Product"
     final val PartialFunction: N     = "PartialFunction"
     final val PrefixType: N          = "PrefixType"
+    final val Record: N              = "Record"
     final val Serializable: N        = "Serializable"
     final val Singleton: N           = "Singleton"
     final val Throwable: N           = "Throwable"
@@ -913,6 +914,7 @@ object StdNames {
     final val NPException: N        = "java.lang.NullPointerException"
     final val Object: N             = "java.lang.Object"
     final val String: N             = "java.lang.String"
+    final val Record: N             = "java.lang.Record"
     final val Throwable: N          = "java.lang.Throwable"
 
     final val ForName: N          = "forName"
@@ -927,6 +929,14 @@ object StdNames {
     final val BeanProperty: N        = "scala.beans.BeanProperty"
     final val BooleanBeanProperty: N = "scala.beans.BooleanBeanProperty"
     final val JavaSerializable: N    = "java.io.Serializable"
+    //
+    // "The identifiers var, yield, and record are restricted identifiers because they are not allowed in some contexts"
+    // A type identifier is an identifier that is not the character sequence var, yield, or record.
+    // An unqualified method identifier is an identifier that is not the character sequence yield.
+    object JavaRestrictedIdentifiers:
+      final val Record: N = "record"
+      final val Var: N    = "var"
+      final val Yield: N  = "yield"
   }
 
   class JavaTermNames extends JavaNames[TermName] {

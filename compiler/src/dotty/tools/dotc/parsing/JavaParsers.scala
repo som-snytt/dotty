@@ -98,6 +98,8 @@ object JavaParsers {
 
     def javaLangObject(): Tree = javaLangDot(tpnme.Object)
 
+    def javaLangRecord(): Tree = javaLangDot(tpnme.Record)
+
     def arrayOf(tpt: Tree): AppliedTypeTree =
       AppliedTypeTree(scalaDot(tpnme.Array), List(tpt))
 
@@ -557,6 +559,14 @@ object JavaParsers {
 
     def definesInterface(token: Int): Boolean = token == INTERFACE || token == AT
 
+    /** If the next token is the identifier "record", convert it into a proper
+     *  token. Technically, "record" is just a restricted identifier. However,
+     *  once we've figured out that it is in a position where it identifies a
+     *  "record" class, it is much more convenient to promote it to a token.
+     */
+    def adaptRecordIdentifier(): Unit =
+      if in.token == IDENTIFIER && in.name == jnme.JavaRestrictedIdentifiers.Record then in.token = RECORD
+
     def termDecl(start: Offset, mods: Modifiers, parentToken: Int, parentTParams: List[TypeDef]): List[Tree] = {
       val inInterface = definesInterface(parentToken)
       val tparams = if (in.token == LT) typeParams(Flags.JavaDefined | Flags.Param) else List()
@@ -584,6 +594,9 @@ object JavaParsers {
           }
         }
       }
+      else if in.token == LBRACE && rtptName != nme.EMPTY && parentToken == RECORD then
+        methodBody() // compact constructor
+        Nil
       else {
         var mods1 = mods
         if (mods.is(Flags.Abstract)) mods1 = mods &~ Flags.Abstract
@@ -720,7 +733,7 @@ object JavaParsers {
     }
 
     def memberDecl(start: Offset, mods: Modifiers, parentToken: Int, parentTParams: List[TypeDef]): List[Tree] = in.token match {
-      case CLASS | ENUM | INTERFACE | AT =>
+      case CLASS | ENUM | RECORD | INTERFACE | AT =>
         typeDecl(start, if (definesInterface(parentToken)) mods | Flags.JavaStatic else mods)
       case _ =>
         termDecl(start, mods, parentToken, parentTParams)
@@ -806,6 +819,53 @@ object JavaParsers {
       addCompanionObject(statics, cls)
     }
 
+    def recordDecl(start: Offset, mods: Modifiers): List[Tree] =
+      accept(RECORD)
+      println(s"OK record")
+      //List(EmptyTree)
+      val pos = in.offset
+      val name = identForType()
+      val tparams = typeParams()
+      val header = formalParams()
+      val superclass = javaLangRecord()
+      val interfaces = interfacesOpt()
+      val (statics, body) = typeBody(RECORD, name, tparams)
+      println(s"header $header")
+
+      // Generate accessors, if not already manually specified
+      var generateAccessors = header
+        .view
+        .map { case ValDef(name, tpt, _) => (name, (tpt, mods.annotations)) }
+        .toMap
+      println(s"genA $generateAccessors")
+      for (case DefDef(name, List(params), _, _) <- body if generateAccessors.contains(name) && params.isEmpty)
+        generateAccessors -= name
+      println(s"genB $generateAccessors")
+      /*
+
+      val accessors = generateAccessors
+        .map { case (name, (tpt, annots)) =>
+          DefDef(Modifiers(Flags.JAVA) withAnnotations annots, name, List(), List(), tpt.duplicate, blankExpr)
+        }
+        .toList
+        */
+
+      // Generate canonical constructor. During parsing this is done unconditionally but the symbol
+      // is unlinked in Namer if it is found to clash with a manually specified constructor.
+      val constructorParams = header.collect {
+        case ValDef(name, tpe, _) => makeParam(name, tpe)
+      }
+      val canonicalCtor = DefDef(nme.CONSTRUCTOR,
+        List(constructorParams), TypeTree(), EmptyTree).withMods(Modifiers(Flags.JavaDefined))
+
+      addCompanionObject(statics, atSpan(start, pos) {
+        TypeDef(
+          name,
+          makeTemplate(superclass :: interfaces, canonicalCtor :: /*accessors :::*/  body, tparams, needsDummyConstr = false).withMods(mods)
+        )
+      })
+    end recordDecl
+
     def interfaceDecl(start: Offset, mods: Modifiers): List[Tree] = {
       accept(INTERFACE)
       val nameOffset = in.offset
@@ -848,12 +908,16 @@ object JavaParsers {
         else if (in.token == SEMI)
           in.nextToken()
         else {
-          if (in.token == ENUM || definesInterface(in.token)) mods |= Flags.JavaStatic
+          // See "14.3. Local Class and Interface Declarations"
+          adaptRecordIdentifier()
+          if (in.token == ENUM || in.token == RECORD || definesInterface(in.token)) mods |= Flags.JavaStatic
           val decls = memberDecl(start, mods, parentToken, parentTParams)
-          (if (mods.is(Flags.JavaStatic) || inInterface && !(decls exists (_.isInstanceOf[DefDef])))
-            statics
-          else
-            members) ++= decls
+          val where =
+            if mods.is(Flags.JavaStatic) || inInterface && !decls.exists(_.isInstanceOf[DefDef]) then
+              statics
+            else
+              members
+          where ++= decls
         }
       }
       (statics.toList, members.toList)
@@ -950,13 +1014,16 @@ object JavaParsers {
       }
     }
 
-    def typeDecl(start: Offset, mods: Modifiers): List[Tree] = in.token match {
+    def typeDecl(start: Offset, mods: Modifiers): List[Tree] =
+      adaptRecordIdentifier()
+      in.token match
       case ENUM      => enumDecl(start, mods)
       case INTERFACE => interfaceDecl(start, mods)
       case AT        => annotationDecl(start, mods)
       case CLASS     => classDecl(start, mods)
+      case RECORD    => recordDecl(start, mods)
       case _         => in.nextToken(); syntaxError("illegal start of type declaration", skipIt = true); List(errorTypeTree)
-    }
+    end typeDecl
 
     def tryConstant: Option[Constant] = {
       val negate = in.token match {

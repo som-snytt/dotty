@@ -22,6 +22,7 @@ object JavaTokens extends TokensCommon {
   inline val INTERFACE = 105;        enter(INTERFACE, "interface")
   inline val ENUM = 106;             enter(ENUM, "enum")
   inline val IMPLEMENTS = 107;       enter(IMPLEMENTS, "implements")
+  inline val RECORD = 108;           enter(RECORD, "record")
 
   /** modifiers */
   inline val PUBLIC = 110;           enter(PUBLIC, "public")
