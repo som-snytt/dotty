@@ -12,12 +12,12 @@ import java.nio.charset.StandardCharsets
 
 import scala.io.Source
 import scala.util.Using
-import scala.collection.mutable.ArrayBuffer
+import scala.collection.mutable.{ArrayBuffer, ListBuffer}
 
 import dotty.tools.dotc.core.Contexts.Context
 import dotty.tools.dotc.reporting.MessageRendering
 import org.junit.{After, Before}
-import org.junit.Assert._
+import org.junit.Assert.fail
 
 class ReplTest(options: Array[String] = ReplTest.defaultOptions, out: ByteArrayOutputStream = new ByteArrayOutputStream)
 extends ReplDriver(options, new PrintStream(out, true, StandardCharsets.UTF_8.name)) with MessageRendering:
@@ -45,7 +45,7 @@ extends ReplDriver(options, new PrintStream(out, true, StandardCharsets.UTF_8.na
 
   def testFile(f: JFile): Unit = testScript(f.toString, readLines(f), Some(f))
 
-  def testScript(name: => String, lines: List[String], scriptFile: Option[JFile] = None): Unit = {
+  def testScript(name: => String, lines: List[String], scriptFile: Option[JFile] = None): Unit =
     val prompt = "scala>"
 
     def evaluate(state: State, input: String) =
@@ -66,15 +66,43 @@ extends ReplDriver(options, new PrintStream(out, true, StandardCharsets.UTF_8.na
         case nonEmptyLine => nonEmptyLine :: Nil
       }
     def nonBlank(line: String): Boolean = line.exists(!Character.isWhitespace(_))
+    // omit blank lines, obfuscate hash from toString, obfuscate frame count and line numbers from stack traces
+    def normalize(ss: List[String]): List[String] =
+      val hashless = "@[a-fA-F0-9]+".r
+      def stripIdentityHashCode(s: String): String = hashless.replaceAllIn(s, "@XXXXXXXX")
+      val res = ListBuffer.empty[String]
+      def loop(rest: List[String]): Unit =
+        rest match
+        case h :: t =>
+          if h.forall(Character.isWhitespace) then ()
+          else if h.contains('@') then res += stripIdentityHashCode(h)
+          else res += stackCleaner.stripFrameCount(h)
+          loop(t)
+        case Nil => ()
+      loop(ss)
+      res.toList
+
+    object stackCleaner:
+      private val elidedAndMore = """(\s+\.{3} )\d+( elided and )\d+( more)""".r
+      private val elidedOrMore  = """(\s+\.{3} )\d+( (?:elided|more))""".r
+      private val frame         = """(\s+at [^(]+\([^:]+):\d+(\))""".r
+      def stripFrameCount(line: String) =
+        line match
+        case elidedAndMore(ellipsis, infix, suffix) => s"$ellipsis???$infix???$suffix"
+        case elidedOrMore(ellipsis, suffix)         => s"$ellipsis???$suffix"
+        case frame(prefix, suffix)                  => s"${prefix}:NNN${suffix}"
+        case _                                      => line
 
     val expectedOutput = lines.filter(nonBlank)
-    val actualOutput = {
+    val actualOutput =
       val opts = toolArgsFor(ToolName.Scalac)(lines.take(1))
+    //val expectedOutput = normalize(lines)
+    //val actualOutput =
+    //  val opts = toolArgsParse(lines.take(1))
       val (optsLine, inputLines) = if opts.isEmpty then ("", lines) else (lines.head, lines.drop(1))
       resetToInitial(opts)
 
-      assert(inputLines.head.startsWith(prompt),
-        s"""Each script must start with the prompt: "$prompt"""")
+      assert(inputLines.head.startsWith(prompt), s"""Each script must start with the prompt: "$prompt"""")
       val inputRes = inputLines.filter(_.startsWith(prompt))
 
       val buf = new ArrayBuffer[String]
@@ -83,8 +111,8 @@ extends ReplDriver(options, new PrintStream(out, true, StandardCharsets.UTF_8.na
         out.linesIterator.foreach(buf.append)
         nstate
       }
-      (optsLine :: buf.toList).filter(nonBlank)
-    }
+      normalize(optsLine :: buf.toList)
+    end actualOutput
 
     if !FileDiff.matches(actualOutput, expectedOutput) then
       // Some tests aren't file-based but just pass a string, so can't update anything then
@@ -101,7 +129,7 @@ extends ReplDriver(options, new PrintStream(out, true, StandardCharsets.UTF_8.na
 
         fail(s"Error in script $name, expected output did not match actual")
     end if
-  }
+  end testScript
 
 object ReplTest:
   val commonOptions = Array("-color:never", "-language:experimental.erasedDefinitions", "-pagewidth", "80")
