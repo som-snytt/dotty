@@ -2638,9 +2638,20 @@ class Typer(@constructorOnly nestingLevel: Int = 0) extends Namer
           // If it exists, complete the class containing the top-level definitions
           // before typing any statement in the package to avoid cycles as in i13669.scala
           val topLevelClassName = desugar.packageObjectName(ctx.source).moduleClassName
+          var stats1 = if ctx.isAfterTyper then tree.stats else
+            tree.stats.mapConserve {
+              case stat @ untpd.ModuleDef(defName, Template(_, List(parent @ Ident(p)), _, _)) if p == typeName("App") =>
+                val tpdParent = typedIdent(parent, NoType)
+                if tpdParent.symbol == defn.AppClass then
+                  val args0 = untpd.ValDef(termName("args0"), untpd.PostfixOp(Ident(typeName("String")), Ident(tpnme.raw.STAR), Thicket(List())))
+                  val rhs = EmptyTree
+                  untpd.DefDef(defName.toTermName, List(List(args0)), Ident(typeName("Unit")), rhs)
+                else stat
+              case stat => stat
+            }
           pkg.moduleClass.info.decls.lookup(topLevelClassName).ensureCompleted()
-          var stats1 = typedStats(tree.stats, pkg.moduleClass)._1
-          if (!ctx.isAfterTyper)
+          stats1 = typedStats(stats1, pkg.moduleClass)._1
+          if !ctx.isAfterTyper then
             stats1 = stats1 ++ typedBlockStats(MainProxies.proxies(stats1))._1
           cpy.PackageDef(tree)(pid1, stats1).withType(pkg.termRef)
         }
