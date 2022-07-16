@@ -1,0 +1,27 @@
+-- [E050] Type Error: tests/neg/i9434b.scala:3:29 ----------------------------------------------------------------------
+3 |  def f[A](as: List[A]) = as headOption // error
+  |                          ^
+  |                          method headOption in trait LinearSeqOps does not take parameters
+4 |    42
+  |
+  | longer explanation available when compiling with `-explain`
+-- [E050] Type Error: tests/neg/i9434b.scala:7:29 ----------------------------------------------------------------------
+7 |  def f[A](as: List[A]) = as headOption // error
+  |                          ^
+  |                          method headOption in trait LinearSeqOps does not take parameters
+8 |  42
+  |
+  | longer explanation available when compiling with `-explain`
+-- [E050] Type Error: tests/neg/i9434b.scala:12:10 ---------------------------------------------------------------------
+12 |  def f = g // error
+   |          ^
+   |          method g in object Y does not take parameters
+13 |    (42)
+   |
+   | longer explanation available when compiling with `-explain`
+-- [E129] Potential Issue Warning: tests/neg/i9434b.scala:18:2 ---------------------------------------------------------
+18 |  (42)
+   |  ^^^^
+   |  A pure expression does nothing in statement position; you may be omitting necessary parentheses
+   |
+   | longer explanation available when compiling with `-explain`

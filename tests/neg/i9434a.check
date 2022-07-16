@@ -1,0 +1,20 @@
+-- [E018] Syntax Error: tests/neg/i9434a.scala:11:18 -------------------------------------------------------------------
+11 |      Vector(1) ++     // error
+   |                  ^
+   |                  expression expected but [31munindent[0m found
+   |
+   | longer explanation available when compiling with `-explain`
+-- [E050] Type Error: tests/neg/i9434a.scala:5:14 ----------------------------------------------------------------------
+5 |    val bar = foo      // error
+  |              ^
+  |              value foo does not take parameters
+6 |      (1, 1)           // scastie error: value foo does not take parameters
+  |
+  | longer explanation available when compiling with `-explain`
+-- [E007] Type Mismatch Error: tests/neg/i9434a.scala:7:3 --------------------------------------------------------------
+7 |  }                    // error: Found: Unit Required: (Int, Int)
+  |   ^
+  |   Found:    Unit
+  |   Required: (Int, Int)
+  |
+  | longer explanation available when compiling with `-explain`

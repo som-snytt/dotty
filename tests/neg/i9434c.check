@@ -1,0 +1,7 @@
+-- [E050] Type Error: tests/neg/i9434c.scala:3:29 ----------------------------------------------------------------------
+3 |  def f[A](as: List[A]) = as headOption // error
+  |                          ^
+  |                          method headOption in trait LinearSeqOps does not take parameters
+4 |  42
+  |
+  | longer explanation available when compiling with `-explain`

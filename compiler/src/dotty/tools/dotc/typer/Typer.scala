@@ -3500,7 +3500,10 @@ class Typer(@constructorOnly nestingLevel: Int = 0) extends Namer
         else
           errorTree(tree, em"Missing arguments for $methodStr")
       case _ => tryInsertApplyOrImplicit(tree, pt, locked) {
-        errorTree(tree, MethodDoesNotTakeParameters(tree))
+        val pos =
+          if pt.args.isEmpty then tree.srcPos
+          else tree.srcPos.sourcePos.withSpan(tree.srcPos.span.union(pt.args.last.srcPos.span))
+        errorTree(tree, MethodDoesNotTakeParameters(tree), pos)
       }
     }
 
