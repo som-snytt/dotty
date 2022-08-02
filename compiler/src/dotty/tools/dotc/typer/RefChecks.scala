@@ -20,12 +20,11 @@ import config.SourceVersion.`3.0`
 import config.Printers.refcheck
 import reporting._
 import Constants.Constant
+import tpd.*
 
 import scala.annotation.unused
 
-object RefChecks {
-  import tpd._
-
+object RefChecks:
   val name: String = "refchecks"
   val description: String = "checks related to abstract members and overriding"
 
@@ -574,7 +573,6 @@ object RefChecks {
         for bc <- clazz.baseClasses; sym <- bc.info.decls.toList do
           if sym.is(DeferredTerm) && !isImplemented(sym) && !ignoreDeferred(sym) then
             buf += sym
-        println(s"Missing in $clazz are ${buf.toList.mkString("\n")}")
         buf.toList
 
       // 2. Check that only abstract classes have deferred members
@@ -592,7 +590,7 @@ object RefChecks {
             else if member.isSetter then "an abstract var requires a setter in addition to the getter"
             else if member.isGetter && !isMultiple then "an abstract var requires a getter in addition to the setter"
             else "variables need to be initialized to be defined"
-          else if underlying.is(Method) then {
+          else if underlying.is(Method) then
             // Highlight any member that nearly matches: same name and arity, but differs in one param or param list.
             val abstractParams = underlying.info.firstParamTypes
             val matchingName = clazz.info.nonPrivateMember(underlying.name).alternatives.filterNot(underlying == _.symbol)
@@ -603,7 +601,7 @@ object RefChecks {
               //sumSize(m.paramLists, 0) == sumSize(abstractParamLists, 0) &&
               //sameLength(m.tpe.typeParams, underlying.tpe.typeParams) &&
             }
-            matchingArity match {
+            matchingArity match
               case concrete :: Nil =>
                 /*
                 val concreteParamLists = concrete.paramLists
@@ -652,8 +650,6 @@ object RefChecks {
                   case _ => EmptyDiagnostic
                 }
               case _ => EmptyDiagnostic
-            }
-          }
           else EmptyDiagnostic
         end diagnose
 
@@ -697,9 +693,11 @@ object RefChecks {
                 if (announceOwner) s"// Members declared in ${owner.fullName}" :: ms else ms
             }.init.map(s => s"  $s\n").mkString
           val isMulti = count > 1
-          val singleParent = if (byOwner.size == 1 && byOwner.head._1 != clazz) s" member${if (isMulti) "s" else ""} of ${byOwner.head._1}" else ""
+          val singleParent =
+            s" member${if isMulti then "s" else ""} of ${byOwner.head._1}".cond(byOwner.size == 1 && byOwner.head._1 != clazz)
+            //if byOwner.size == 1 && byOwner.head._1 != clazz then s" member${if isMulti then "s" else ""} of ${byOwner.head._1}" else ""
           val line0 =
-            if (isMulti) s"Missing implementations for ${count}${val p = singleParent ; if (p.isEmpty) " members" else p}."
+            if isMulti then s"Missing implementations for ${count}${val p = singleParent; if p.isEmpty then " members" else p}."
             else s"Missing implementation${val p = singleParent ; if (p.isEmpty) p else s" for$p"}:"
           abstractClassError(line0, supplement = stubs)
 
@@ -1069,8 +1067,7 @@ object RefChecks {
 
   end checkImplicitNotFoundAnnotation
 
-}
-import RefChecks._
+  extension (inline s: => String) inline def cond(b: Boolean): String = if b then s else ""
 
 /** Post-attribution checking and transformation, which fulfills the following roles
  *
@@ -1102,9 +1099,10 @@ import RefChecks._
  *  todo: But RefChecks is not done yet. It's still a somewhat dirty port from the Scala 2 version.
  *  todo: move untrivial logic to their own mini-phases
  */
-class RefChecks extends MiniPhase { thisPhase =>
+class RefChecks extends MiniPhase:
+  thisPhase =>
 
-  import tpd._
+  import RefChecks.*
 
   override def phaseName: String = RefChecks.name
 
@@ -1148,7 +1146,7 @@ class RefChecks extends MiniPhase { thisPhase =>
       report.error(ex, tree.srcPos)
       tree
   }
-}
+end RefChecks
 
 /* todo: rewrite and re-enable
 
