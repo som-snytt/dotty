@@ -27,7 +27,7 @@ import transform.SymUtils._
 import Nullables._
 import config.Feature
 
-import collection.mutable
+import collection.mutable, mutable.ListBuffer
 import config.Printers.{overload, typr, unapp}
 import TypeApplications._
 
@@ -207,7 +207,7 @@ object Applications {
     end tupleFold
     tupleFold(Nil, tp).reverse
 
-  def wrapDefs(defs: mutable.ListBuffer[Tree] | Null, tree: Tree)(using Context): Tree =
+  def wrapDefs(defs: ListBuffer[Tree] | Null, tree: Tree)(using Context): Tree =
     if (defs != null && defs.nonEmpty) tpd.Block(defs.toList, tree) else tree
 
   /** Find reference to default parameter getter for parameter #n in current
@@ -742,8 +742,8 @@ trait Applications extends Compatibility {
   extends Application(methRef, fun.tpe, args, resultType) {
     type TypedArg = Tree
     def isVarArg(arg: Trees.Tree[T]): Boolean = untpd.isWildcardStarArg(arg)
-    private var typedArgBuf = new mutable.ListBuffer[Tree]
-    private var liftedDefs: mutable.ListBuffer[Tree] | Null = null
+    private var typedArgBuf = ListBuffer.empty[Tree]
+    private var liftedDefs: ListBuffer[Tree] | Null = null
     private var myNormalizedFun: Tree = fun
     init()
 
@@ -781,7 +781,7 @@ trait Applications extends Compatibility {
 
     override def liftFun(): Unit =
       if (liftedDefs == null) {
-        liftedDefs = new mutable.ListBuffer[Tree]
+        liftedDefs = ListBuffer.empty[Tree]
         myNormalizedFun = lifter.liftApp(liftedDefs.uncheckedNN, myNormalizedFun)
       }
 
@@ -825,7 +825,7 @@ trait Applications extends Compatibility {
             liftFun()
 
             // lift arguments in the definition order
-            val argDefBuf = mutable.ListBuffer.empty[Tree]
+            val argDefBuf = ListBuffer.empty[Tree]
             typedArgs = lifter.liftArgs(argDefBuf, methType, typedArgs)
             // Lifted arguments ordered based on the original order of typedArgBuf and
             // with all non-explicit default parameters at the end in declaration order.
@@ -1027,7 +1027,7 @@ trait Applications extends Compatibility {
       val (lhs1, name, rhss) = (tree: @unchecked) match
         case Apply(Select(lhs, name), rhss) => (typedExpr(lhs), name, rhss)
         case Apply(untpd.TypedSplice(Select(lhs1, name)), rhss) => (lhs1, name, rhss)
-      val liftedDefs = new mutable.ListBuffer[Tree]
+      val liftedDefs = ListBuffer.empty[Tree]
       val lhs2 = untpd.TypedSplice(LiftComplex.liftAssigned(liftedDefs, lhs1))
       val assign = untpd.Assign(lhs2,
           untpd.Apply(untpd.Select(lhs2, name.asSimpleName.dropRight(1)), rhss))
