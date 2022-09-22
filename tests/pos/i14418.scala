@@ -6,17 +6,17 @@ case class C(c: Int) {
 object Test extends App {
   println {
     var x = new C(42)
-    x = x + (3, 9)
+    x = x + (1, 9)
     x
   }
   println {
     var x = new C(42)
-    x.+=(3, 9)
+    x.+=(2, 9)
     x
   }
   println {
     var x = new C(42)
-    x += (3, 9)
+    x += (3, 9)  // was: value += is not a member of C - did you mean C.!=?
     x
   }
 }

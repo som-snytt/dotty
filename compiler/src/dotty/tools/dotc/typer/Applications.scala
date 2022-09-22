@@ -915,6 +915,7 @@ trait Applications extends Compatibility {
         if originalProto.hasTupledDual && needsTupledDual(fun1.tpe, originalProto)
         then originalProto.tupledDual
         else originalProto
+      println(s"PROTO hasDual ${originalProto.hasTupledDual} needsDual ${needsTupledDual(fun1.tpe, originalProto)} res $proto")
 
       /** Type application where arguments come from prototype, and no implicits are inserted */
       def simpleApply(fun1: Tree, proto: FunProto)(using Context): Tree =
@@ -1024,14 +1025,21 @@ trait Applications extends Compatibility {
      *     { val xs = es; e' = e' + args }
      */
     def typedOpAssign(using Context): Tree = {
+      println(s"OPASSIGN $tree")
+      new Throwable(s"OPASSIGN $tree").printStackTrace()
       val (lhs1, name, rhss) = (tree: @unchecked) match
         case Apply(Select(lhs, name), rhss) => (typedExpr(lhs), name, rhss)
         case Apply(untpd.TypedSplice(Select(lhs1, name)), rhss) => (lhs1, name, rhss)
       val liftedDefs = ListBuffer.empty[Tree]
       val lhs2 = untpd.TypedSplice(LiftComplex.liftAssigned(liftedDefs, lhs1))
-      val assign = untpd.Assign(lhs2,
-          untpd.Apply(untpd.Select(lhs2, name.asSimpleName.dropRight(1)), rhss))
+      val assign = untpd.Assign(lhs2, untpd.InfixOp(lhs2, untpd.Ident(name.asSimpleName.dropRight(1)), untpd.Tuple(rhss)))
+      //val assign = untpd.Assign(lhs2,
+          //untpd.Apply(untpd.Select(lhs2, name.asSimpleName.dropRight(1)), rhss))
+      println(i"OPASSIGN lhs $lhs1 op $name; lifted ${liftedDefs.toList}, assign $assign")
+      val res =
       wrapDefs(liftedDefs, typed(assign))
+      println("AFTER")
+      res
     }
 
     val app1 =
