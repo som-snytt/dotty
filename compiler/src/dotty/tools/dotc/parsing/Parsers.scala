@@ -620,10 +620,14 @@ object Parsers {
     /** Check that this is not the start of a statement that's indented relative to the current region.
      */
     def checkNextNotIndented(): Unit =
-      if in.isNewLine then
+      if testNextNotIndented() then
+        warning(em"Line is indented too far to the right, or a `{` or `:` is missing", in.next.offset)
+
+    def testNextNotIndented(): Boolean =
+      in.isNewLine && {
         val nextIndentWidth = in.indentWidth(in.next.offset)
-        if in.currentRegion.indentWidth < nextIndentWidth then
-          warning(em"Line is indented too far to the right, or a `{` or `:` is missing", in.next.offset)
+        in.currentRegion.indentWidth < nextIndentWidth
+      }
 
 /* -------- REWRITES ----------------------------------------------------------- */
 
@@ -3687,7 +3691,9 @@ object Parsers {
     /** ClassDef ::= id ClassConstr TemplateOpt
      */
     def classDef(start: Offset, mods: Modifiers): TypeDef = atSpan(start, nameStart) {
-      classDefRest(start, mods, ident().toTypeName)
+      val name = ident()
+      checkSuspiciousColon(name, nameStart)
+      classDefRest(start, mods, name.toTypeName)
     }
 
     def classDefRest(start: Offset, mods: Modifiers, name: TypeName): TypeDef =
@@ -3713,9 +3719,15 @@ object Parsers {
      */
     def objectDef(start: Offset, mods: Modifiers): ModuleDef = atSpan(start, nameStart) {
       val name = ident()
+      checkSuspiciousColon(name, nameStart)
       val templ = templateOpt(emptyConstructor)
       finalizeDef(ModuleDef(name, templ), mods, start)
     }
+
+    // Catch inadvertent fusion of punctuation as operator char (name_:)
+    private def checkSuspiciousColon(name: Name, offset: Offset): Unit =
+      if name.endsWith(":") && testNextNotIndented() then
+        warning(em"name ends in `:` before indented line", offset-1)
 
     private def checkAccessOnly(mods: Modifiers, where: String): Modifiers =
       val mods1 = mods & (AccessFlags | Enum)
