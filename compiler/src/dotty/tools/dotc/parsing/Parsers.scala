@@ -3691,8 +3691,9 @@ object Parsers {
     /** ClassDef ::= id ClassConstr TemplateOpt
      */
     def classDef(start: Offset, mods: Modifiers): TypeDef = atSpan(start, nameStart) {
+      val where = nameStart
       val name = ident()
-      checkSuspiciousColon(name, nameStart)
+      checkSuspiciousColon(name, where)
       classDefRest(start, mods, name.toTypeName)
     }
 
@@ -3726,8 +3727,16 @@ object Parsers {
 
     // Catch inadvertent fusion of punctuation as operator char (name_:)
     private def checkSuspiciousColon(name: Name, offset: Offset): Unit =
-      if name.endsWith(":") && testNextNotIndented() then
-        warning(em"name ends in `:` before indented line", offset-1)
+      if name.endsWith(":") then
+        val lookahead = in.LookaheadScanner()
+        def loop: Boolean =
+          if testNextNotIndented() then true
+          else if in.isNewLine then
+            in.nextToken()
+            loop
+          else false
+        if loop then
+          warning(em"name ends in `:` before indented line", offset-1)
 
     private def checkAccessOnly(mods: Modifiers, where: String): Modifiers =
       val mods1 = mods & (AccessFlags | Enum)

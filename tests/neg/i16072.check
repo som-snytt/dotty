@@ -6,11 +6,19 @@
 5 |  def f = 42            // error
   |  ^
   |  Line is indented too far to the right, or a `{` or `:` is missing
--- Error: tests/neg/i16072.scala:10:32 ---------------------------------------------------------------------------------
+-- Error: tests/neg/i16072.scala:10:5 ----------------------------------------------------------------------------------
 10 |class C_:               // error
-   |                                ^
-   |                                name ends in `:` before indented line
+   |     ^
+   |     name ends in `:` before indented line
 -- Error: tests/neg/i16072.scala:11:2 ----------------------------------------------------------------------------------
 11 |  def c = 42            // error
+   |  ^
+   |  Line is indented too far to the right, or a `{` or `:` is missing
+-- Error: tests/neg/i16072.scala:13:5 ----------------------------------------------------------------------------------
+13 |class D_:               // error
+   |     ^
+   |     name ends in `:` before indented line
+-- Error: tests/neg/i16072.scala:15:2 ----------------------------------------------------------------------------------
+15 |  def d = 42            // error
    |  ^
    |  Line is indented too far to the right, or a `{` or `:` is missing

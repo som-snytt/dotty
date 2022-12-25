@@ -9,3 +9,7 @@ object `Underscore_`:
 
 class C_:               // error
   def c = 42            // error
+
+class D_:               // error
+
+  def d = 42            // error
