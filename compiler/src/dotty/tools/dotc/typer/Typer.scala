@@ -530,6 +530,7 @@ class Typer(@constructorOnly nestingLevel: Int = 0) extends Namer
       foundUnderScala2 = NoType
       try
         val found = findRef(name, pt, EmptyFlags, EmptyFlags, tree.srcPos)
+        println(s"FOUND $found")
         if foundUnderScala2.exists && !(foundUnderScala2 =:= found) then
           report.migrationWarning(
             em"""Name resolution will change.

@@ -236,7 +236,11 @@ extends NamingMsg(DuplicateBindID) {
 
 class MissingIdent(tree: untpd.Ident, treeKind: String, val name: Name)(using Context)
 extends NotFoundMsg(MissingIdentID) {
-  def msg(using Context) = i"Not found: $treeKind$name"
+  //def msg(using Context) = i"Not found: $treeKind$name"
+  def msg(using Context) =
+    println(s"NO SUCH $name for tree ${tree.show}")
+    Thread.dumpStack()
+    i"Not found: $treeKind$name"
   def explain(using Context) = {
     i"""|The identifier for `$treeKind$name` is not bound, that is,
         |no declaration for this identifier can be found.
