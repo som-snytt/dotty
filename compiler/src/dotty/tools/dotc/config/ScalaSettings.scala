@@ -145,6 +145,7 @@ private sealed trait VerboseSettings:
   val Xprint: Setting[List[String]] = PhasesSetting("-Vprint", "Print out program after", aliases = List("-Xprint"))
   val XshowPhases: Setting[Boolean] = BooleanSetting("-Vphases", "List compiler phases.", aliases = List("-Xshow-phases"))
 
+  val Vclasspath: Setting[Boolean] = BooleanSetting("-Vclasspath", "Output information about what classpath is being applied.", aliases = List("-Ylog-classpath"))
   val Vprofile: Setting[Boolean] = BooleanSetting("-Vprofile", "Show metrics about sources and internal representations to estimate compile-time complexity.")
   val VprofileSortedBy = ChoiceSetting("-Vprofile-sorted-by", "key", "Show metrics about sources and internal representations sorted by given column name", List("name", "path", "lines", "tokens", "tasty", "complexity"), "")
   val VprofileDetails = IntSetting("-Vprofile-details", "Show metrics about sources and internal representations of the most complex methods", 0)
@@ -326,7 +327,6 @@ private sealed trait YSettings:
   val YdebugUnpickling: Setting[Boolean] = BooleanSetting("-Ydebug-unpickling", "Print the stack trace when an error occurs when reading Tasty.", false)
   val YtermConflict: Setting[String] = ChoiceSetting("-Yresolve-term-conflict", "strategy", "Resolve term conflicts", List("package", "object", "error"), "error")
   val Ylog: Setting[List[String]] = PhasesSetting("-Ylog", "Log operations during")
-  val YlogClasspath: Setting[Boolean] = BooleanSetting("-Ylog-classpath", "Output information about what classpath is being applied.")
   val YdisableFlatCpCaching: Setting[Boolean] = BooleanSetting("-YdisableFlatCpCaching", "Do not cache flat classpath representation of classpath elements from jars across compiler instances.")
 
   val Yscala2Unpickler: Setting[String] = StringSetting("-Yscala2-unpickler", "", "Control where we may get Scala 2 symbols from. This is either \"always\", \"never\", or a classpath.", "always")
