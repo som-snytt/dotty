@@ -22,11 +22,7 @@ object Rewrites {
   private class Patches(source: SourceFile) {
     private[Rewrites] val pbuf = new mutable.ListBuffer[Patch]()
 
-    def addPatch(span: Span, replacement: String): Unit =
-      pbuf.indexWhere(p => p.span.start == span.start && p.span.end == span.end) match {
-        case i if i >= 0 => pbuf.update(i, Patch(span, replacement))
-        case _           => pbuf += Patch(span, replacement)
-      }
+    def addPatch(span: Span, replacement: String): Unit = pbuf += Patch(span, replacement)
 
     def apply(cs: Array[Char]): Array[Char] = {
       val delta = pbuf.map(_.delta).sum
