@@ -494,6 +494,12 @@ trait ParallelTesting extends RunnerOrchestration { self =>
         .and("-d", targetDir.getPath)
         .withClasspath(targetDir.getPath)
 
+      def waitForJudiciously(process: Process): Int =
+        try process.waitFor()
+        catch case _: InterruptedException =>
+          val ok = process.waitFor(5L, TimeUnit.MINUTES)
+          if ok then process.exitValue() else -2
+
       def compileWithJavac(fs: Array[String]) = if (fs.nonEmpty) {
         val fullArgs = Array(
           "javac",
@@ -503,7 +509,7 @@ trait ParallelTesting extends RunnerOrchestration { self =>
         val process = Runtime.getRuntime.exec(fullArgs)
         val output = Source.fromInputStream(process.getErrorStream).mkString
 
-        if (process.waitFor() != 0) Some(output)
+        if waitForJudiciously(process) != 0 then Some(output)
         else None
       } else None
 
