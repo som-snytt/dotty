@@ -1817,6 +1817,8 @@ class Namer { typer: Typer =>
               paramss match
                 case TermSymbols(vparams) :: paramss1 if info.paramNames.length == vparams.length =>
                   instantiatedResType(info.instantiate(vparams.map(_.termRef)), paramss1)
+                case Nil =>
+                  instantiatedResType(info.instantiate(Nil), Nil)
                 case _ =>
                   NoType
             case _ =>
