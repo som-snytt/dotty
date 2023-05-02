@@ -1818,7 +1818,9 @@ class Namer { typer: Typer =>
                 case TermSymbols(vparams) :: paramss1 if info.paramNames.length == vparams.length =>
                   instantiatedResType(info.instantiate(vparams.map(_.termRef)), paramss1)
                 case Nil =>
-                  instantiatedResType(info.instantiate(Nil), Nil)
+                  //instantiatedResType(info.instantiate(Nil), Nil)
+                  println(s"USE result ${info.resultType}")
+                  instantiatedResType(info.resultType, Nil)
                 case _ =>
                   NoType
             case _ =>
@@ -1830,6 +1832,7 @@ class Namer { typer: Typer =>
           val iResType = instantiatedResType(iRawInfo, paramss).asSeenFrom(site, cls)
           if (iResType.exists)
             typr.println(i"using inherited type for ${mdef.name}; raw: $iRawInfo, inherited: $iResType")
+          println(s"using inherited type for ${mdef.name}; raw: $iRawInfo, inherited: $iResType, & ${tp & iResType}")
           tp & iResType
         }
     end inherited
