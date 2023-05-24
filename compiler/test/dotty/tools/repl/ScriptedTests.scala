@@ -16,5 +16,9 @@ class ScriptedTests extends ReplTest {
   @Test def typePrinterTests = scripts("/type-printer").foreach(testFile)
 }
 
-object ScriptedTests {
-}
+object ScriptedTests
+
+class MyScriptedTests extends ReplTest:
+  @Test def testIt() =
+    sys.props.addOne("dotty.tests.filter" -> "14700")
+    scripts("/repl").foreach(testFile)

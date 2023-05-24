@@ -4,6 +4,7 @@ package transform
 
 import core._
 import Contexts._
+import Phases._
 import Symbols._
 import Types._
 import Flags._
@@ -77,8 +78,14 @@ class ElimByName extends MiniPhase, InfoTransformer:
     symd.is(Param) || symd.is(ParamAccessor, butNot = Method)
 
   def transformInfo(tp: Type, sym: Symbol)(using Context): Type = tp match {
+    case ExprType(rt) =>
+      if exprBecomesFunction(sym) then println(s"xform exprtype($rt) becomes func? ${ exprBecomesFunction(sym) }")
+      if exprBecomesFunction(sym) then defn.ByNameFunction(rt)
+      else tp
+      /*
     case ExprType(rt) if exprBecomesFunction(sym) =>
       defn.ByNameFunction(rt)
+      */
     case tp: MethodType =>
       def exprToFun(tp: Type, name: Name) = tp match
         case ExprType(rt) =>
@@ -98,6 +105,8 @@ class ElimByName extends MiniPhase, InfoTransformer:
     sym.is(Method) || exprBecomesFunction(sym)
 
   def byNameClosure(arg: Tree, argType: Type)(using Context): Tree =
+    new Throwable(s"creating by name closure for $argType").printStackTrace()
+    println(s"creating by name closure for $argType")
     report.log(i"creating by name closure for $argType")
     val meth = newAnonFun(ctx.owner, MethodType(Nil, argType), coord = arg.span)
     Closure(meth,
@@ -108,9 +117,10 @@ class ElimByName extends MiniPhase, InfoTransformer:
   private def isByNameRef(tree: Tree)(using Context): Boolean =
     defn.isByNameFunction(tree.tpe.widen)
 
-  /** Map `tree` to `tree.apply()` is `tree` is of type `() ?=> T` */
+  /** Map `tree` to `tree.apply()` if `tree` is of type `() ?=> T` */
   private def applyIfFunction(tree: Tree)(using Context) =
     if isByNameRef(tree) then
+      println(s"apply ctx fnc $tree")
       val tree0 = transformFollowing(tree)
       atPhase(next) { tree0.select(defn.ContextFunction0_apply).appliedToNone }
     else tree
@@ -130,10 +140,12 @@ class ElimByName extends MiniPhase, InfoTransformer:
   }
 
   override def transformApply(tree: Apply)(using Context): Tree =
+    println(s"transforming apply ${tree.show} at phase ${ctx.phase}")
     trace(s"transforming ${tree.show} at phase ${ctx.phase}", show = true) {
 
       def transformArg(arg: Tree, formal: Type): Tree = formal match
         case defn.ByNameFunction(formalResult) =>
+          println(s"OK BNF: $formal is $formalResult")
           def stripTyped(t: Tree): Tree = t match
             case Typed(expr, _) => stripTyped(expr)
             case _ => t
@@ -145,11 +157,16 @@ class ElimByName extends MiniPhase, InfoTransformer:
               if isByNameRef(arg) || arg.symbol.name.is(SuperArgName) then arg
               else byNameClosure(arg, formalResult)
         case _ =>
+          println(s"NOT BNF: $formal")
           arg
 
+      atPhase(typerPhase) {
       val mt @ MethodType(_) = tree.fun.tpe.widen: @unchecked
+      println(s"MT $mt from $tree or ${tree.fun} tpe ${tree.fun.tpe} wide ${tree.fun.tpe.widen}")
+      println(s"tree args ${tree.args} and paramInfos ${mt.paramInfos}")
       val args1 = tree.args.zipWithConserve(mt.paramInfos)(transformArg)
       cpy.Apply(tree)(tree.fun, args1)
+      }
     }
 
   override def transformValDef(tree: ValDef)(using Context): Tree =

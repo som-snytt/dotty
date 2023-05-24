@@ -1674,8 +1674,9 @@ class TypeComparer(@constructorOnly initctx: Context) extends ConstraintHandling
           case ExprType(arg2res)
           if ctx.phaseId > elimByNamePhase.id && !ctx.erasedTypes
                && defn.isByNameFunction(arg1.dealias) =>
-            // ElimByName maps `=> T` to `()? => T`, but only in method parameters. It leaves
+            // ElimByName maps `=> T` to `() ?=> T`, but only in method parameters. It leaves
             // embedded `=> T` arguments alone. This clause needs to compensate for that.
+            println(s"isSubArg($arg1, $arg2)? ${ isSubArg(arg1.dealias.argInfos.head, arg2res) }")
             isSubArg(arg1.dealias.argInfos.head, arg2res)
           case _ =>
             arg1 match

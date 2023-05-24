@@ -1,0 +1,13 @@
+// scalac: -Vprint:refchecks,elimByName,erasure,repl
+scala> def g(args: Int*)(block: => Unit): Unit = println(s"Well, ${args.sum} and $block")
+def g(args: Int*)(block: => Unit): Unit
+
+scala> def f = g()
+def f: (=> Unit) => Unit
+
+scala> f(println("x"))
+x
+FIXME.java.lang.ClassCastException: class scala.runtime.BoxedUnit cannot be cast to class scala.Function0 (scala.runtime.BoxedUnit and scala.Function0 are in unnamed module of loader java.net.URLClassLoader @654b72c0)
+  at scala.runtime.function.JProcedure1.apply(JProcedure1.java:15)
+  at scala.runtime.function.JProcedure1.apply(JProcedure1.java:10)
+  ... 34 elided
