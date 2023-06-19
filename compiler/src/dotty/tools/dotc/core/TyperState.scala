@@ -53,7 +53,6 @@ class TyperState() {
 
   def reporter: Reporter = myReporter
 
-  /** A fresh type state with the same constraint as this one and the given reporter */
   def setReporter(reporter: Reporter): this.type = { myReporter = reporter; this }
 
   private var myConstraint: Constraint = _

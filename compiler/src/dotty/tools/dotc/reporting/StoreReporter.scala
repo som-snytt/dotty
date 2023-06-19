@@ -17,9 +17,11 @@ import Diagnostic._
   * - The reporter is not flushed and the message containers capture a
   *   `Context` (about 4MB)
   */
-class StoreReporter(outer: Reporter | Null = Reporter.NoReporter, fromTyperState: Boolean = false) extends Reporter {
+class StoreReporter(outer: Reporter | Null = Reporter.NoReporter, fromTyperState: Boolean = false) extends Reporter:
 
   protected var infos: mutable.ListBuffer[Diagnostic] | Null = null
+
+  private inline def allInfos = infos.uncheckedNN
 
   def doReport(dia: Diagnostic)(using Context): Unit = {
     typr.println(s">>>> StoredError: ${dia.message}") // !!! DEBUG
@@ -34,7 +36,8 @@ class StoreReporter(outer: Reporter | Null = Reporter.NoReporter, fromTyperState
     infos != null && infos.uncheckedNN.exists(_.isInstanceOf[StickyError])
 
   override def removeBufferedMessages(using Context): List[Diagnostic] =
-    if (infos != null) try infos.uncheckedNN.toList finally infos = null
+    if infos != null
+    then try allInfos.toList finally infos = null
     else Nil
 
   override def pendingMessages(using Context): List[Diagnostic] =
@@ -48,4 +51,3 @@ class StoreReporter(outer: Reporter | Null = Reporter.NoReporter, fromTyperState
   override def report(dia: Diagnostic)(using Context): Unit =
     if fromTyperState then issueUnconfigured(dia)
     else super.report(dia)
-}

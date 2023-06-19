@@ -69,6 +69,7 @@ class Run(comp: Compiler, ictx: Context) extends ImplicitRunInfo with Constraint
   private val mySuspendedMessages: mutable.LinkedHashMap[SourceFile, mutable.LinkedHashSet[Warning]] = mutable.LinkedHashMap.empty
 
   object suppressions:
+    def debug = mySuspendedMessages.toList.map((src,ws) => ws.mkString(s"$src: ", ", ", ""))
     // When the REPL creates a new run (ReplDriver.compile), parsing is already done in the old context, with the
     // previous Run. Parser warnings were suspended in the old run and need to be copied over so they are not lost.
     // Same as scala/scala/commit/79ca1408c7.
@@ -85,9 +86,11 @@ class Run(comp: Compiler, ictx: Context) extends ImplicitRunInfo with Constraint
       mySuppressions.getOrElse(dia.pos.source, Nil).find(_.matches(dia)) match {
         case Some(s) =>
           s.markUsed()
+          println(s"Here $s of $mySuppressions at ${dia.pos}")
           if (s.verbose) Action.Verbose
           else Action.Silent
         case _ =>
+          println(s"Other of $mySuppressions at ${dia.pos}")
           Action.Warning
       }
 
@@ -97,8 +100,11 @@ class Run(comp: Compiler, ictx: Context) extends ImplicitRunInfo with Constraint
 
     def reportSuspendedMessages(source: SourceFile)(using Context): Unit = {
       // sort suppressions. they are not added in any particular order because of lazy type completion
-      for (sups <- mySuppressions.get(source))
-        mySuppressions(source) = sups.sortBy(sup => 0 - sup.start)
+      //for (sups <- mySuppressions.get(source))
+      //  mySuppressions(source) = sups.sortBy(sup => 0 - sup.start)
+      mySuppressions.updateWith(source):
+        case Some(sups) => Some(sups.sortBy(0 - _.start))
+        case _ => None
       mySuppressionsComplete += source
       mySuspendedMessages.remove(source).foreach(_.foreach(ctx.reporter.issueIfNotSuppressed))
     }
@@ -114,6 +120,8 @@ class Run(comp: Compiler, ictx: Context) extends ImplicitRunInfo with Constraint
           sup    <- sups.reverse
         } if (!sup.used)
           report.warning("@nowarn annotation does not suppress any warnings", sup.annotPos)
+
+  end suppressions
 
   /** The compilation units currently being compiled, this may return different
    *  results over time.

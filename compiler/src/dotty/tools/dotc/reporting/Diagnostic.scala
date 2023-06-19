@@ -26,6 +26,8 @@ object Diagnostic:
     pos: SourcePosition
   ) extends Diagnostic(msg, pos, ERROR):
     def this(str: => String, pos: SourcePosition) = this(str.toMessage, pos)
+    println(s"Error $msg")
+    //Thread.dumpStack()
 
   /** A sticky error is an error that should not be hidden by backtracking and
    *  trying some alternative path. Typically, errors issued after catching

@@ -171,6 +171,8 @@ abstract class Reporter extends interfaces.ReporterResult {
   def issueIfNotSuppressed(dia: Diagnostic)(using Context): Unit =
     def go() =
       import Action._
+      //println(s"ISSUE $dia")
+      //Thread.dumpStack()
       dia match
         case w: Warning => WConf.parsed.action(w) match
           case Error   => issueUnconfigured(w.toError)
@@ -184,6 +186,7 @@ abstract class Reporter extends interfaces.ReporterResult {
     // only created in ReplDriver.compile when a line is submitted. This means that `@nowarn` doesnt work on parser
     // warnings in the first line.
     val run = ctx.run
+    println(s"run $run supp ${run.suppressions.debug} dia $dia")
     dia match
       case w: Warning if run != null =>
         val sup = run.suppressions
@@ -202,8 +205,7 @@ abstract class Reporter extends interfaces.ReporterResult {
 
   def report(dia: Diagnostic)(using Context): Unit = issueIfNotSuppressed(dia)
 
-  def incomplete(dia: Diagnostic)(using Context): Unit =
-    incompleteHandler(dia, ctx)
+  def incomplete(dia: Diagnostic)(using Context): Unit = incompleteHandler(dia, ctx)
 
   /** Summary of warnings and errors */
   def summary: String = {
@@ -258,6 +260,7 @@ abstract class Reporter extends interfaces.ReporterResult {
   /** Issue all messages in this reporter to next outer one, or make sure they are written. */
   def flush()(using Context): Unit =
     val msgs = removeBufferedMessages
+    println(s"FLUSH to $ctx: ${msgs.size}, unrepo ${unreportedWarnings.size}")
     if msgs.nonEmpty then msgs.foreach(ctx.reporter.report)
     for (key, count) <- unreportedWarnings do
       ctx.reporter.addUnreported(key, count)
