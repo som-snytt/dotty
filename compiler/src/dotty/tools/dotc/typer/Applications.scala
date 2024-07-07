@@ -1105,23 +1105,16 @@ trait Applications extends Compatibility {
         if fun1.symbol.name == nme.apply && fun1.span.isSynthetic then
           fun1 match
             case Select(qualifier, _) =>
-              def mapMessage(dia: Diagnostic): Diagnostic =
-                dia match
-                  case dia: Diagnostic.Error =>
-                    dia.msg match
-                      case msg: TypeMismatch =>
-                        msg.inTree match
-                          case Some(arg) if tree.args.exists(_.span == arg.span) =>
-                            val noteText =
-                              i"""The required type comes from a parameter of the automatically
-                                  |inserted `apply` method of `${qualifier.tpe}`.""".stripMargin
-                            Diagnostic.Error(msg.appendExplanation("\n\n" + noteText), dia.pos)
-                          case _ => dia
-                      case msg => dia
-                  case dia => dia
-              failedState.reporter.mapBufferedMessages(mapMessage)
-            case _ => ()
-        else ()
+              import dotty.tools.dotc.interfaces.Diagnostic.ERROR
+              failedState.reporter.mapBufferedMessages:
+                case Diagnostic(msg: TypeMismatch, pos, ERROR)
+                if msg.inTree.exists(t => tree.args.exists(_.span == t.span)) =>
+                  val noteText =
+                    i"""The required type comes from a parameter of the automatically
+                        |inserted `apply` method of `${qualifier.tpe}`.""".stripMargin
+                  Diagnostic.Error(msg.appendExplanation("\n\n" + noteText), pos)
+                case dia => dia
+            case _ =>
 
       fun1.tpe match {
         case err: ErrorType => cpy.Apply(tree)(fun1, proto.typedArgs()).withType(err)
