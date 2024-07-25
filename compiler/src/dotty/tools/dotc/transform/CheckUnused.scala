@@ -425,7 +425,7 @@ object CheckUnused:
         val newDataInScope =
           for sel <- reorderedSelectors yield
             val data = new ImportSelectorData(qualTpe, sel)
-            if shouldSelectorBeReported(imp, sel) || sel.isImportExclusion || isImportIgnored(imp, sel) then
+            if shouldSelectorBeReportedAsUsed(imp, sel) || sel.isImportExclusion || isImportIgnored(imp, sel) then
               // Immediately mark the selector as used
               data.markUsed()
             data
@@ -448,7 +448,7 @@ object CheckUnused:
 
     /** Register pattern variable */
     def registerPatVar(patvar: tpd.Bind)(using Context): Unit =
-      if !patvar.symbol.isUnusedAnnot then
+      if !patvar.symbol.hasUnusedAnnot then
         patVarsInScope += patvar
 
     /** enter a new scope */
@@ -590,7 +590,7 @@ object CheckUnused:
      * If -Wunused:strict-no-implicit-warn import and this import selector could potentially import implicit.
      * return true
      */
-    private def shouldSelectorBeReported(imp: tpd.Import, sel: ImportSelector)(using Context): Boolean =
+    private def shouldSelectorBeReportedAsUsed(imp: tpd.Import, sel: ImportSelector)(using Context): Boolean =
       ctx.settings.WunusedHas.strictNoImplicitWarn && (
         sel.isWildcard ||
         imp.expr.tpe.member(sel.name.toTermName).alternatives.exists(_.symbol.isOneOf(GivenOrImplicit)) ||
@@ -626,40 +626,33 @@ object CheckUnused:
 
       /** Given an import selector, is the symbol imported from the given prefix, optionally with a specific name?
        *  If isDerived, then it may be an aliased type in source but we only witness it dealiased.
+       *  `altName` is the original name, i.e., the name written by the user that was actually looked up.
        */
       private def isInImport(selData: ImportSelectorData, altName: Option[Name], prefix: Type, isDerived: Boolean)(using Context): Boolean =
         assert(sym.exists)
 
         val selector = selData.selector
 
-        if !selector.isWildcard then
-          if altName.exists(explicitName => selector.rename != explicitName.toTermName) then
-            // if there is an explicit name, it must match
-            false
-          else if isDerived then
-            // See i15503i.scala, grep for "package foo.test.i17156"
-            selData.allSymbolsDealiasedForNamed.contains(sym.dealiasAsType)
-          else (prefix.typeSymbol.isPackageObject || selData.qualTpe =:= prefix) &&
-            selData.allSymbolsForNamed.contains(sym)
-        else
-          // Wildcard
-          if !selData.qualTpe.member(sym.name).hasAltWith(_.symbol == sym) then
-            // The qualifier does not have the target symbol as a member
-            false
-          else
-            if selector.isGiven then
-              // Further check that the symbol is a given or implicit and conforms to the bound
+        if selector.isWildcard then
+          selData.qualTpe.member(sym.name).hasAltWith(_.symbol == sym) && { // The qualifier must have the target symbol as a member
+            if selector.isGiven then // Further check that the symbol is a given or implicit and conforms to the bound
               sym.isOneOf(Given | Implicit)
                 && (selector.bound.isEmpty || sym.info.finalResultType <:< selector.boundTpe)
                 && selData.qualTpe =:= prefix
             else
-              // Normal wildcard, check that the symbol is not a given (but can be implicit)
-              !sym.is(Given)
-        end if
+              !sym.is(Given) // Normal wildcard, check that the symbol is not a given (but can be implicit)
+          }
+        else
+          !altName.exists(_.toTermName != selector.rename) && { // if there is an explicit name, it must match
+            if isDerived then
+              selData.allSymbolsDealiasedForNamed.contains(sym.dealiasAsType) // scala3#17156
+            else (prefix.typeSymbol.isPackageObject || selData.qualTpe =:= prefix) &&
+              selData.allSymbolsForNamed.contains(sym)
+          }
       end isInImport
 
       /** Annotated with @unused */
-      private def isUnusedAnnot(using Context): Boolean =
+      private def hasUnusedAnnot(using Context): Boolean =
         sym.annotations.exists(_.symbol == ctx.definitions.UnusedAnnot)
 
       private def shouldNotReportParamOwner(using Context): Boolean =
@@ -709,7 +702,7 @@ object CheckUnused:
     extension (memDef: tpd.MemberDef)
       private def isValidMemberDef(using Context): Boolean =
         memDef.symbol.exists
-          && !memDef.symbol.isUnusedAnnot
+          && !memDef.symbol.hasUnusedAnnot
           && !memDef.symbol.isAllOf(Flags.AccessorCreationFlags)
           && !memDef.name.isWildcard
           && !memDef.symbol.owner.is(ExtensionMethod)
