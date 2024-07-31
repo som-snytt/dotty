@@ -3,8 +3,7 @@ package dotty.tools.dotc.transform
 import scala.annotation.tailrec
 
 import dotty.tools.uncheckedNN
-import dotty.tools.dotc.ast.tpd
-import dotty.tools.dotc.ast.tpd.{Inlined, TreeTraverser}
+import dotty.tools.dotc.ast.tpd.*
 import dotty.tools.dotc.ast.untpd, untpd.ImportSelector
 import dotty.tools.dotc.config.ScalaSettings
 import dotty.tools.dotc.core.Contexts.*
@@ -13,15 +12,12 @@ import dotty.tools.dotc.core.Denotations.SingleDenotation
 import dotty.tools.dotc.core.Flags.*
 import dotty.tools.dotc.core.Phases.Phase
 import dotty.tools.dotc.core.StdNames.nme
-import dotty.tools.dotc.core.Symbols.*
 import dotty.tools.dotc.core.Types.{AnnotatedType, ClassInfo, ConstantType, NamedType, NoType, TermRef, Type, TypeProxy, TypeTraverser}
 import dotty.tools.dotc.core.Flags
 import dotty.tools.dotc.core.Names.Name
 import dotty.tools.dotc.core.NameOps.isReplWrapperName
-import dotty.tools.dotc.core.Annotations
-import dotty.tools.dotc.core.Definitions
 import dotty.tools.dotc.core.NameKinds.WildcardParamName
-import dotty.tools.dotc.core.Symbols.{Symbol, isDeprecated}
+import dotty.tools.dotc.core.Symbols.{NoSymbol, Symbol, defn, isDeprecated}
 import dotty.tools.dotc.report
 import dotty.tools.dotc.reporting.{Message, UnusedSymbol as UnusedSymbolMessage}
 import dotty.tools.dotc.transform.MegaPhase.MiniPhase
@@ -43,24 +39,26 @@ class CheckUnused private (phaseMode: PhaseMode, suffix: String)(using Key) exte
 
   private inline def ud(using ud: UnusedData): UnusedData = ud
 
-  private inline def go[U](inline op: UnusedData ?=> U)(using ctx: Context): ctx.type =
+  private inline def prep[U](inline op: UnusedData ?=> U)(using ctx: Context): ctx.type =
     ctx.property(summon[Key]) match
       case Some(ud) => op(using ud)
       case None     =>
     ctx
+
+  private inline def go[U](tree: Tree)(inline op: UnusedData ?=> U)(using ctx: Context): tree.type =
+    ctx.property(summon[Key]) match
+      case Some(ud) => op(using ud)
+      case None     =>
+    tree
 
   override def phaseName: String = CheckUnused.phaseNamePrefix + suffix
 
   override def description: String = CheckUnused.description
 
   override def isRunnable(using Context): Boolean =
-    super.isRunnable &&
-    ctx.settings.Wunused.value.nonEmpty &&
-    !ctx.isJava
+    super.isRunnable && ctx.settings.Wunused.value.nonEmpty && !ctx.isJava
 
-  // ========== SETUP ============
-
-  override def prepareForUnit(tree: tpd.Tree)(using Context): Context =
+  override def prepareForUnit(tree: Tree)(using Context): Context =
     val key = summon[Key]
     val data = UnusedData()
     tree.getAttachment(key).foreach(oldData =>
@@ -68,23 +66,12 @@ class CheckUnused private (phaseMode: PhaseMode, suffix: String)(using Key) exte
     )
     ctx.fresh.setProperty(key, data).tap(_ => tree.putAttachment(key, data))
 
-  // ========== END + REPORTING ==========
+  override def transformUnit(tree: Tree)(using Context): tree.type = go(tree):
+    ud.finishAggregation()
+    if phaseMode == PhaseMode.Report then
+      ud.unusedAggregate.foreach(reportUnused)
 
-  override def transformUnit(tree: tpd.Tree)(using Context): tpd.Tree =
-    go:
-      ud.finishAggregation()
-      if phaseMode == PhaseMode.Report then
-        ud.unusedAggregate.foreach(reportUnused)
-    tree
-
-  // ========== MiniPhase Prepare ==========
-  override def prepareForOther(tree: tpd.Tree)(using Context): Context = go:
-    traverser.traverse(tree)
-
-  override def prepareForInlined(tree: tpd.Inlined)(using Context): Context = go:
-    traverser.traverse(tree.call)
-
-  override def prepareForIdent(tree: tpd.Ident)(using Context): Context = go:
+  override def transformIdent(tree: Ident)(using Context): tree.type = go(tree):
     if tree.symbol.exists then
       def loopOnNormalizedPrefixes(prefix: Type, depth: Int): Unit =
         // limit to 10 as failsafe for the odd case where there is an infinite cycle
@@ -93,164 +80,134 @@ class CheckUnused private (phaseMode: PhaseMode, suffix: String)(using Key) exte
           loopOnNormalizedPrefixes(prefix.normalizedPrefix, depth + 1)
       val prefix = tree.typeOpt.normalizedPrefix
       loopOnNormalizedPrefixes(prefix, depth = 0)
-      ud.registerUsed(tree.symbol, Some(tree.name), tree.typeOpt.importPrefix)
+      ud.registerUsed(tree.symbol, Some(tree.name), tree.typeOpt.importPrefix.skipPackageObject)
     else if tree.hasType then
-      ud.registerUsed(tree.tpe.classSymbol, Some(tree.name), tree.tpe.importPrefix)
+      ud.registerUsed(tree.tpe.classSymbol, Some(tree.name), tree.tpe.importPrefix.skipPackageObject)
 
-  override def prepareForSelect(tree: tpd.Select)(using Context): Context = go:
+  override def transformSelect(tree: Select)(using Context): tree.type = go(tree):
     val name = tree.removeAttachment(OriginalName)
     ud.registerUsed(tree.symbol, name, tree.qualifier.tpe, includeForImport = tree.qualifier.span.isSynthetic)
 
-  override def prepareForBlock(tree: tpd.Block)(using Context): Context =
-    pushScope(tree)
-
-  override def prepareForTemplate(tree: tpd.Template)(using Context): Context =
-    pushScope(tree)
-
-  override def prepareForPackageDef(tree: tpd.PackageDef)(using Context): Context =
-    pushScope(tree)
-
-  override def prepareForValDef(tree: tpd.ValDef)(using Context): Context = go:
-    traverseAnnotations(tree.symbol)
-    // do not register the ValDef generated for `object`
-    if !tree.symbol.is(Module) then
-      ud.registerDef(tree)
-    if tree.name.startsWith("derived$") && tree.hasType then
-      ud.registerUsed(tree.tpe.typeSymbol, None, tree.tpe.importPrefix, isDerived = true)
-    ud.addIgnoredUsage(tree.symbol)
-
-  override def prepareForDefDef(tree: tpd.DefDef)(using Context): Context = go:
-    if !tree.symbol.is(Private) then
-      tree.termParamss.flatten.foreach(p => ud.addIgnoredParam(p.symbol))
-    ud.registerTrivial(tree)
-    traverseAnnotations(tree.symbol)
-    ud.registerDef(tree)
-    ud.addIgnoredUsage(tree.symbol)
-
-  override def prepareForTypeDef(tree: tpd.TypeDef)(using Context): Context = go:
-    if !tree.symbol.is(Param) then // Ignore type parameter (as Scala 2)
-      traverseAnnotations(tree.symbol)
-      ud.registerDef(tree)
-      ud.addIgnoredUsage(tree.symbol)
-
-  override def prepareForBind(tree: tpd.Bind)(using Context): Context = go:
-    traverseAnnotations(tree.symbol)
-    ud.registerPatVar(tree)
-
-  override def prepareForTypeTree(tree: tpd.TypeTree)(using Context): Context = go:
-    if !tree.isInstanceOf[tpd.InferredTypeTree] then typeTraverser.traverse(tree.tpe)
-
-  override def prepareForAssign(tree: tpd.Assign)(using Context): Context = go:
+  override def transformAssign(tree: Assign)(using Context): tree.type = go(tree):
     val sym = tree.lhs.symbol
     if sym.exists then
       ud.registerSetVar(sym)
 
-  // ========== MiniPhase Transform ==========
+  override def prepareForBlock(tree: Block)(using Context): Context = prep:
+    pushScope(tree)
 
-  override def transformBlock(tree: tpd.Block)(using Context): tpd.Tree =
+  override def transformBlock(tree: Block)(using Context): tree.type = go(tree):
     popScope(tree)
-    tree
 
-  override def transformTemplate(tree: tpd.Template)(using Context): tpd.Tree =
+  override def transformInlined(tree: Inlined)(using Context): tree.type = go(tree):
+    traverser.traverseChildren(tree)
+
+  override def transformTypeTree(tree: TypeTree)(using Context): tree.type = go(tree):
+    if !tree.isInstanceOf[InferredTypeTree] then typeTraverser.traverse(tree.tpe)
+
+  override def prepareForValDef(tree: ValDef)(using Context): Context = prep:
+    ud.addIgnoredUsage(tree.symbol)
+
+  override def transformValDef(tree: ValDef)(using Context): tree.type = go(tree):
+    traverseAnnotations(tree.symbol)
+    if !tree.symbol.is(Module) then // do not register the ValDef generated for `object`
+      ud.registerDef(tree)
+    if tree.name.startsWith("derived$") && tree.hasType then
+      def core(t: Tree): (Symbol, Option[Name], Type) = t match
+        case Ident(name)  => (t.tpe.typeSymbol, Some(name), t.tpe.underlyingPrefix)
+        case Select(t, _) => core(t)
+        case _            => (NoSymbol, None, NoType)
+      tree.getAttachment(OriginalTypeClass) match
+        case Some(orig) =>
+          val (typsym, name, prefix) = core(orig)
+          ud.registerUsed(typsym, name, prefix.skipPackageObject, isDerived = true)
+        case _ =>
+    ud.removeIgnoredUsage(tree.symbol)
+
+  override def prepareForDefDef(tree: DefDef)(using Context): Context = prep:
+    ud.registerTrivial(tree)
+    if !tree.symbol.is(Private) then
+      tree.termParamss.flatten.foreach(p => ud.addIgnoredParam(p.symbol))
+    ud.addIgnoredUsage(tree.symbol)
+
+  override def transformDefDef(tree: DefDef)(using Context): Tree = go(tree):
+    traverseAnnotations(tree.symbol)
+    ud.registerDef(tree)
+    ud.removeIgnoredUsage(tree.symbol)
+
+  override def prepareForTypeDef(tree: TypeDef)(using Context): Context = prep:
+    ud.addIgnoredUsage(tree.symbol)
+
+  override def transformTypeDef(tree: TypeDef)(using Context): Tree = go(tree):
+    if !tree.symbol.is(Param) then
+      traverseAnnotations(tree.symbol)
+      ud.registerDef(tree)
+    ud.removeIgnoredUsage(tree.symbol)
+
+  override def transformBind(tree: Bind)(using Context): tree.type = go(tree):
+    traverseAnnotations(tree.symbol)
+    ud.registerPatVar(tree)
+
+  override def prepareForTemplate(tree: Template)(using Context): Context = prep:
+    pushScope(tree)
+
+  override def transformTemplate(tree: Template)(using Context): tree.type = go(tree):
     popScope(tree)
-    tree
 
-  override def transformPackageDef(tree: tpd.PackageDef)(using Context): tpd.Tree =
+  override def prepareForPackageDef(tree: PackageDef)(using Context): Context = prep:
+    pushScope(tree)
+
+  override def transformPackageDef(tree: PackageDef)(using Context): tree.type = go(tree):
     popScope(tree)
-    tree
 
-  override def transformValDef(tree: tpd.ValDef)(using Context): tpd.Tree =
-    go:
-      ud.removeIgnoredUsage(tree.symbol)
-    tree
+  override def prepareForStats(trees: List[Tree])(using Context): Context = ctx
 
-  override def transformDefDef(tree: tpd.DefDef)(using Context): tpd.Tree =
-    go:
-      ud.removeIgnoredUsage(tree.symbol)
-    tree
+  override def transformStats(trees: List[Tree])(using Context): List[Tree] =
+    trees
 
-  override def transformTypeDef(tree: tpd.TypeDef)(using Context): tpd.Tree =
-    go:
-      ud.removeIgnoredUsage(tree.symbol)
-    tree
+  //override def prepareForOther(tree: Tree)(using Context): Context = prep:
+  //  println(s"PREP ${tree.getClass}")
 
-  private def pushScope(tree: tpd.Block | tpd.Template | tpd.PackageDef)(using Context): Context = go:
+  override def transformOther(tree: Tree)(using Context): tree.type = go(tree):
+    //println(s"TRAN ${tree.getClass}")
+    tree match
+    case imp: Import =>
+      ud.registerImport(imp)
+      imp.selectors
+        .filter(_.isGiven)
+        .map(_.bound).collect {
+          case untpd.TypedSplice(tree1) => tree1
+        }.foreach(transformAllDeep)
+      traverser.traverse(imp.expr)
+    case _: InferredTypeTree =>
+    case _ if tree.isType =>
+      typeTraverser.traverse(tree.tpe)
+      traverser.traverseChildren(tree)
+    case _ =>
+      traverser.traverseChildren(tree)
+
+  private def pushScope(tree: Block | Template | PackageDef)(using Context): Unit = prep:
     ud.pushScope(ScopeType.fromTree(tree))
 
-  private def popScope(tree: tpd.Block | tpd.Template | tpd.PackageDef)(using Context): Context = go:
+  private def popScope(tree: Block | Template | PackageDef)(using Context): Unit = prep:
     ud.popScope(ScopeType.fromTree(tree))
 
-  /**
-   * This traverse is the **main** component of this phase
-   *
-   * It traverse the tree the tree and gather the data in the
-   * corresponding context property
-   *
-   * A standard tree traverser covers cases not handled by the Mega/MiniPhase
+  /** Handle early-phase trees by dispatching subtrees through transform.
    */
-  private def traverser = new TreeTraverser:
+  private def traverser = ChildFriendlyTreeTraverser()
 
-    // Register every import, definition and usage
-    override def traverse(tree: tpd.Tree)(using Context): Unit =
-      val newCtx = if tree.symbol.exists then ctx.withOwner(tree.symbol) else ctx
-      tree match
-        case imp: tpd.Import =>
-          go(ud.registerImport(imp))
-          imp.selectors.filter(_.isGiven).map(_.bound).collect {
-            case untpd.TypedSplice(tree1) => tree1
-          }.foreach(traverse(_)(using newCtx))
-          traverseChildren(tree)(using newCtx)
-        case ident: tpd.Ident =>
-          prepareForIdent(ident)
-          traverseChildren(tree)(using newCtx)
-        case sel: tpd.Select =>
-          prepareForSelect(sel)
-          traverseChildren(tree)(using newCtx)
-        case tree: (tpd.Block | tpd.Template | tpd.PackageDef) =>
-          //! DIFFERS FROM MINIPHASE
-          pushScope(tree)
-          traverseChildren(tree)(using newCtx)
-          popScope(tree)
-        case t: tpd.ValDef =>
-          prepareForValDef(t)
-          traverseChildren(tree)(using newCtx)
-          transformValDef(t)
-        case t: tpd.DefDef =>
-          prepareForDefDef(t)
-          traverseChildren(tree)(using newCtx)
-          transformDefDef(t)
-        case t: tpd.TypeDef =>
-          prepareForTypeDef(t)
-          traverseChildren(tree)(using newCtx)
-          transformTypeDef(t)
-        case t: tpd.Bind =>
-          prepareForBind(t)
-          traverseChildren(tree)(using newCtx)
-        case t: tpd.Assign =>
-          prepareForAssign(t)
-          traverseChildren(tree)
-        case _: tpd.InferredTypeTree =>
-        case tpd.RefinedTypeTree(tpt, refinements) =>
-          //! DIFFERS FROM MINIPHASE
-          typeTraverser.traverse(tree.tpe)
-          traverse(tpt)(using newCtx)
-        case tpd.TypeTree() =>
-          //! DIFFERS FROM MINIPHASE
-          typeTraverser.traverse(tree.tpe)
-          traverseChildren(tree)(using newCtx)
-        case _ =>
-          //! DIFFERS FROM MINIPHASE
-          traverseChildren(tree)(using newCtx)
-    end traverse
-  end traverser
+  private class ChildFriendlyTreeTraverser extends TreeTraverser:
+    override def traverseChildren(tree: Tree)(using Context): Unit = super.traverseChildren(tree)
+    override def traverse(tree: Tree)(using Context): Unit = transformAllDeep(tree)
+  end ChildFriendlyTreeTraverser
 
   /** This is a type traverser which catch some special Types not traversed by the term traverser above */
   private def typeTraverser(using Context) = new TypeTraverser:
     override def traverse(tp: Type): Unit =
-      if tp.typeSymbol.exists then go(ud.registerUsed(tp.typeSymbol, Some(tp.typeSymbol.name), tp.importPrefix))
+      if tp.typeSymbol.exists then prep(ud.registerUsed(tp.typeSymbol, Some(tp.typeSymbol.name), tp.importPrefix))
       tp match
         case AnnotatedType(_, annot) =>
-          go(ud.registerUsed(annot.symbol, None, annot.symbol.info.importPrefix))
+          prep(ud.registerUsed(annot.symbol, None, annot.symbol.info.importPrefix))
           traverseChildren(tp)
         case _ =>
           traverseChildren(tp)
@@ -296,14 +253,14 @@ object CheckUnused:
     case UnsetLocals
     case UnsetPrivates
 
-  /**
-   * The key used to retrieve the "unused entity" analysis metadata,
-   * from the compilation `Context`
-   */
+  /** The key used to retrieve the "unused entity" analysis metadata from context. */
   private type Key = Property.StickyKey[UnusedData]
   private given Key = Property.StickyKey[UnusedData]
 
+  /** Attachment holding the name of an Ident as written by the user. */
   val OriginalName = Property.StickyKey[Name]
+  /** Attachment holding the name of a type class as written by the user. */
+  val OriginalTypeClass = Property.StickyKey[Tree]
 
   class PostTyper extends CheckUnused(PhaseMode.Aggregate, "PostTyper")
 
@@ -325,21 +282,19 @@ object CheckUnused:
 
     var unusedAggregate: Option[UnusedResult] = None
 
-    /* IMPORTS */
     private val impInScope = Stack(ListBuffer.empty[ImportSelectorData])
     private val usedInScope = Stack(mut.Map.empty[Symbol, ListBuffer[Usage]])
     private val usedInPosition = mut.Map.empty[Name, mut.Set[Symbol]]
     /* unused import collected during traversal */
     private val unusedImport = ListBuffer.empty[ImportSelectorData]
 
-    /* LOCAL DEF OR VAL / Private Def or Val / Pattern variables */
-    private val localDefInScope = ListBuffer.empty[tpd.MemberDef]
-    private val privateDefInScope = ListBuffer.empty[tpd.MemberDef]
-    private val explicitParamInScope = ListBuffer.empty[tpd.MemberDef]
-    private val implicitParamInScope = ListBuffer.empty[tpd.MemberDef]
-    private val patVarsInScope = ListBuffer.empty[tpd.Bind]
+    private val localDefInScope = ListBuffer.empty[MemberDef]
+    private val privateDefInScope = ListBuffer.empty[MemberDef]
+    private val explicitParamInScope = ListBuffer.empty[MemberDef]
+    private val implicitParamInScope = ListBuffer.empty[MemberDef]
+    private val patVarsInScope = ListBuffer.empty[Bind]
 
-    /** All variables sets*/
+    /** All variables set */
     private val setVars = mut.Set.empty[Symbol]
 
     /** All used symbols */
@@ -370,15 +325,14 @@ object CheckUnused:
      * as the same element can be imported with different renaming
      */
     def registerUsed(sym: Symbol, name: Option[Name], prefix: Type = NoType, includeForImport: Boolean = true, isDerived: Boolean = false)(using Context): Unit =
-      if sym.exists && !isConstructorOfSynth(sym) && !doNotRegister(sym) then
+      def isJavaMember = sym.is(JavaDefined, butNot = Package)
+      if sym.exists && !isJavaMember && !isConstructorOfSynth(sym) && !doNotRegister(sym) then
         if sym.isConstructor then
           registerUsed(sym.owner, None, prefix, includeForImport) // constructor are "implicitly" imported with the class
         else
           // If the symbol is accessible in this scope without an import, do not register it for unused import analysis
           val includeForImport1 =
-            includeForImport
-              && (name.exists(_.toTermName != sym.name.toTermName) || !sym.isAccessibleAsIdent)
-
+            includeForImport && (name.exists(_.toTermName != sym.name.toTermName) || !sym.isAccessibleAsIdent)
           def addIfExists(sym: Symbol): Unit =
             if sym.exists then
               usedDef += sym
@@ -391,10 +345,16 @@ object CheckUnused:
             for n <- name do
               usedInPosition.getOrElseUpdate(n, mut.Set.empty) += sym
 
+    def excludeUsage(sym: Symbol)(using Context): Boolean =
+      val exclusions = List(defn.SourceFileAnnot, defn.ModuleSerializationProxyClass)
+      exclusions.exists(s => sym == s)
+    def excludePrefix(sym: Symbol)(using Context): Boolean =
+      sym == defn.ScalaRuntimePackageClass
     def addUsage(usage: Usage)(using Context): Unit =
-      val usages = usedInScope.top.getOrElseUpdate(usage.symbol, ListBuffer.empty)
-      if !usages.exists(cur => cur.name == usage.name && cur.isDerived == usage.isDerived && cur.prefix =:= usage.prefix)
-      then usages += usage
+      if !excludePrefix(usage.prefix.typeSymbol) && !excludeUsage(usage.symbol) then
+        val usages = usedInScope.top.getOrElseUpdate(usage.symbol, ListBuffer.empty)
+        if !usages.exists(cur => cur.name == usage.name && cur.isDerived == usage.isDerived && cur.prefix =:= usage.prefix)
+        then usages += usage
 
     /** Register a symbol that should be ignored */
     def addIgnoredUsage(sym: Symbol)(using Context): Unit =
@@ -408,14 +368,14 @@ object CheckUnused:
       paramsToSkip += sym
 
     /** Register an import */
-    def registerImport(imp: tpd.Import)(using Context): Unit =
+    def registerImport(imp: Import)(using Context): Unit =
       if
-        !tpd.languageImport(imp.expr).nonEmpty
+        !languageImport(imp.expr).nonEmpty
           && !imp.isGeneratedByEnum
           && !isTransparentAndInline(imp)
           && peekScopeType != ScopeType.ReplWrapper // #18383 Do not report top-level import's in the repl as unused
       then
-        val qualTpe = imp.expr.tpe
+        val qualTpe = imp.expr.tpe.underlying
 
         // Put wildcard imports at the end, because they have lower priority within one Import
         val reorderedSelectors =
@@ -433,7 +393,7 @@ object CheckUnused:
     end registerImport
 
     /** Register (or not) some `val` or `def` according to the context, scope and flags */
-    def registerDef(memDef: tpd.MemberDef)(using Context): Unit =
+    def registerDef(memDef: MemberDef)(using Context): Unit =
       if memDef.isValidMemberDef && !isDefIgnored(memDef) then
         if memDef.isValidParam then
           if memDef.symbol.isOneOf(GivenOrImplicit) then
@@ -447,7 +407,7 @@ object CheckUnused:
           privateDefInScope += memDef
 
     /** Register pattern variable */
-    def registerPatVar(patvar: tpd.Bind)(using Context): Unit =
+    def registerPatVar(patvar: Bind)(using Context): Unit =
       if !patvar.symbol.hasUnusedAnnot then
         patVarsInScope += patvar
 
@@ -541,7 +501,7 @@ object CheckUnused:
     /**
      * Checks if import selects a def that is transparent and inline
      */
-    private def isTransparentAndInline(imp: tpd.Import)(using Context): Boolean =
+    private def isTransparentAndInline(imp: Import)(using Context): Boolean =
       imp.selectors.exists { sel =>
         val qual = imp.expr
         val importedMembers = qual.tpe.member(sel.name).alternatives.map(_.symbol)
@@ -579,9 +539,7 @@ object CheckUnused:
     private def isConstructorOfSynth(sym: Symbol)(using Context): Boolean =
       sym.exists && sym.isConstructor && sym.owner.isPackageObject && sym.owner.is(Synthetic)
 
-    /**
-     * This is used to avoid reporting the parameters of the synthetic main method
-     * generated by `@main`
+    /** This is used to avoid reporting the parameters of the synthetic main method generated by `@main`.
      */
     private def isSyntheticMainParam(sym: Symbol)(using Context): Boolean =
       sym.exists && ctx.platform.isMainMethod(sym.owner) && sym.owner.is(Synthetic)
@@ -590,7 +548,7 @@ object CheckUnused:
      * If -Wunused:strict-no-implicit-warn import and this import selector could potentially import implicit.
      * return true
      */
-    private def shouldSelectorBeReportedAsUsed(imp: tpd.Import, sel: ImportSelector)(using Context): Boolean =
+    private def shouldSelectorBeReportedAsUsed(imp: Import, sel: ImportSelector)(using Context): Boolean =
       ctx.settings.WunusedHas.strictNoImplicitWarn && (
         sel.isWildcard ||
         imp.expr.tpe.member(sel.name.toTermName).alternatives.exists(_.symbol.isOneOf(GivenOrImplicit)) ||
@@ -600,7 +558,7 @@ object CheckUnused:
     /**
      * Ignore CanEqual imports
      */
-    private def isImportIgnored(imp: tpd.Import, sel: ImportSelector)(using Context): Boolean =
+    private def isImportIgnored(imp: Import, sel: ImportSelector)(using Context): Boolean =
       (sel.isWildcard && sel.isGiven && imp.expr.tpe.allMembers.exists(p => p.symbol.typeRef.baseClasses.exists(_.derivesFrom(defn.CanEqualClass)) && p.symbol.isOneOf(GivenOrImplicit))) ||
       (imp.expr.tpe.member(sel.name.toTermName).alternatives
         .exists(p => p.symbol.isOneOf(GivenOrImplicit) && p.symbol.typeRef.baseClasses.exists(_.derivesFrom(defn.CanEqualClass))))
@@ -608,7 +566,7 @@ object CheckUnused:
     /**
      * Ignore definitions of CanEqual given
      */
-    private def isDefIgnored(memDef: tpd.MemberDef)(using Context): Boolean =
+    private def isDefIgnored(memDef: MemberDef)(using Context): Boolean =
       memDef.symbol.isOneOf(GivenOrImplicit) && memDef.symbol.typeRef.baseClasses.exists(_.derivesFrom(defn.CanEqualClass))
 
     extension (sel: ImportSelector)
@@ -643,12 +601,8 @@ object CheckUnused:
               !sym.is(Given) // Normal wildcard, check that the symbol is not a given (but can be implicit)
           }
         else
-          !altName.exists(_.toTermName != selector.rename) && { // if there is an explicit name, it must match
-            if isDerived then
-              selData.allSymbolsDealiasedForNamed.contains(sym.dealiasAsType) // scala3#17156
-            else (prefix.typeSymbol.isPackageObject || selData.qualTpe =:= prefix) &&
-              selData.allSymbolsForNamed.contains(sym)
-          }
+          !altName.exists(_.toTermName != selector.rename) && // if there is an explicit name, it must match
+            selData.qualTpe =:= prefix && selData.allSymbolsForNamed.contains(sym)
       end isInImport
 
       /** Annotated with @unused */
@@ -678,7 +632,7 @@ object CheckUnused:
 
     end extension
 
-    extension (defdef: tpd.DefDef)
+    extension (defdef: DefDef)
       // so trivial that it never consumes params
       private def isTrivial(using Context): Boolean =
         val rhs = defdef.rhs
@@ -686,7 +640,7 @@ object CheckUnused:
         rhs.tpe =:= ctx.definitions.NothingType ||
         defdef.symbol.is(Deferred) ||
         (rhs match {
-          case _: tpd.Literal => true
+          case _: Literal => true
           case _ => rhs.tpe match
             case ConstantType(_) => true
             case tp: TermRef =>
@@ -699,7 +653,7 @@ object CheckUnused:
         if defdef.isTrivial then
           trivialDefs += defdef.symbol
 
-    extension (memDef: tpd.MemberDef)
+    extension (memDef: MemberDef)
       private def isValidMemberDef(using Context): Boolean =
         memDef.symbol.exists
           && !memDef.symbol.hasUnusedAnnot
@@ -720,7 +674,7 @@ object CheckUnused:
         val sym = memDef.symbol
         sym.is(Mutable) && !setVars(sym)
 
-    extension (imp: tpd.Import)
+    extension (imp: Import)
       /** Enum generate an import for its cases (but outside them), which should be ignored */
       def isGeneratedByEnum(using Context): Boolean =
         imp.symbol.exists && imp.symbol.owner.is(Flags.Enum, butNot = Flags.Case)
@@ -740,9 +694,9 @@ object CheckUnused:
 
     object ScopeType:
       /** return the scope corresponding to the enclosing scope of the given tree */
-      def fromTree(tree: tpd.Tree)(using Context): ScopeType = tree match
-        case _: tpd.Template => if tree.symbol.name.isReplWrapperName then ReplWrapper else Template
-        case _: tpd.Block => Local
+      def fromTree(tree: Tree)(using Context): ScopeType = tree match
+        case _: Template => if tree.symbol.name.isReplWrapperName then ReplWrapper else Template
+        case _: Block => Local
         case _ => Other
 
     final class ImportSelectorData(val qualTpe: Type, val selector: ImportSelector):
@@ -770,7 +724,7 @@ object CheckUnused:
 
     case class UnusedSymbol(pos: SrcPos, name: Name, warnType: WarnTypes)
     /** A container for the results of the used elements analysis */
-    case class UnusedResult(warnings: Set[UnusedSymbol])
+    class UnusedResult(val warnings: Set[UnusedSymbol])
     object UnusedResult:
       val Empty = UnusedResult(Set.empty)
 
@@ -799,4 +753,14 @@ object CheckUnused:
       case tp: ClassInfo => tp.prefix
       case tp: TypeProxy => tp.superType.normalizedPrefix
       case _ => NoType
+    def underlyingPrefix(using Context): Type = tp match
+      case tp: NamedType => tp.prefix
+      case tp: ClassInfo => tp.prefix
+      case tp: TypeProxy => tp.underlying.underlyingPrefix
+      case _ => NoType
+    def skipPackageObject(using Context): Type =
+      if tp.typeSymbol.isPackageObject then tp.underlyingPrefix else tp
+    def underlying(using Context): Type = tp match
+      case tp: TypeProxy => tp.underlying
+      case _ => tp
 end CheckUnused
