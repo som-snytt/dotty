@@ -120,7 +120,7 @@ class CheckUnused private (phaseMode: PhaseMode, suffix: String)(using Key) exte
       tree.getAttachment(OriginalTypeClass) match
         case Some(orig) =>
           val (typsym, name, prefix) = core(orig)
-          ud.registerUsed(typsym, name, prefix.skipPackageObject, isDerived = true)
+          ud.registerUsed(typsym, name, prefix.skipPackageObject)
         case _ =>
     ud.removeIgnoredUsage(tree.symbol)
 
@@ -324,7 +324,7 @@ object CheckUnused:
      * The optional name will be used to target the right import
      * as the same element can be imported with different renaming
      */
-    def registerUsed(sym: Symbol, name: Option[Name], prefix: Type = NoType, includeForImport: Boolean = true, isDerived: Boolean = false)(using Context): Unit =
+    def registerUsed(sym: Symbol, name: Option[Name], prefix: Type = NoType, includeForImport: Boolean = true)(using Context): Unit =
       def isJavaMember = sym.is(JavaDefined, butNot = Package)
       if sym.exists && !isJavaMember && !isConstructorOfSynth(sym) && !doNotRegister(sym) then
         if sym.isConstructor then
@@ -337,7 +337,7 @@ object CheckUnused:
             if sym.exists then
               usedDef += sym
               if includeForImport1 then
-                addUsage(Usage(sym, name, prefix, isDerived))
+                addUsage(Usage(sym, name, prefix))
           addIfExists(sym)
           addIfExists(sym.companionModule)
           addIfExists(sym.companionClass)
@@ -353,7 +353,7 @@ object CheckUnused:
     def addUsage(usage: Usage)(using Context): Unit =
       if !excludePrefix(usage.prefix.typeSymbol) && !excludeUsage(usage.symbol) then
         val usages = usedInScope.top.getOrElseUpdate(usage.symbol, ListBuffer.empty)
-        if !usages.exists(cur => cur.name == usage.name && cur.isDerived == usage.isDerived && cur.prefix =:= usage.prefix)
+        if !usages.exists(cur => cur.name == usage.name && cur.prefix =:= usage.prefix)
         then usages += usage
 
     /** Register a symbol that should be ignored */
@@ -420,10 +420,7 @@ object CheckUnused:
     def registerSetVar(sym: Symbol): Unit =
       setVars += sym
 
-    /**
-     * leave the current scope and do :
-     *
-     * - If there are imports in this scope check for unused ones
+    /** Leave current scope and mark any used imports; collect unused imports.
      */
     def popScope(scopeType: ScopeType)(using Context): Unit =
       assert(currScopeType.pop() == scopeType)
@@ -431,7 +428,7 @@ object CheckUnused:
 
       for usedInfos <- usedInScope.pop().valuesIterator; usedInfo <- usedInfos do
         import usedInfo.*
-        selDatas.find(symbol.isInImport(_, name, prefix, isDerived)) match
+        selDatas.find(symbol.isInImport(_, name, prefix)) match
           case Some(sel) =>
             sel.markUsed()
           case None =>
@@ -583,10 +580,8 @@ object CheckUnused:
     extension (sym: Symbol)
 
       /** Given an import selector, is the symbol imported from the given prefix, optionally with a specific name?
-       *  If isDerived, then it may be an aliased type in source but we only witness it dealiased.
-       *  `altName` is the original name, i.e., the name written by the user that was actually looked up.
        */
-      private def isInImport(selData: ImportSelectorData, altName: Option[Name], prefix: Type, isDerived: Boolean)(using Context): Boolean =
+      private def isInImport(selData: ImportSelectorData, altName: Option[Name], prefix: Type)(using Context): Boolean =
         assert(sym.exists)
 
         val selector = selData.selector
@@ -714,12 +709,6 @@ object CheckUnused:
           myAllSymbols = allDenots.map(_.symbol).toSet
         myAllSymbols.uncheckedNN
 
-      private var myAllSymbolsDealiased: Set[Symbol] | Null = null
-
-      def allSymbolsDealiasedForNamed(using Context): Set[Symbol] =
-        if myAllSymbolsDealiased == null then
-          myAllSymbolsDealiased = allSymbolsForNamed.map(_.dealiasAsType)
-        myAllSymbolsDealiased.uncheckedNN
     end ImportSelectorData
 
     case class UnusedSymbol(pos: SrcPos, name: Name, warnType: WarnTypes)
@@ -731,7 +720,7 @@ object CheckUnused:
     /** A symbol usage includes the name under which it was observed,
      *  the prefix from which it was selected, and whether it is in a derived element.
      */
-    class Usage(val symbol: Symbol, val name: Option[Name], val prefix: Type, val isDerived: Boolean)
+    class Usage(val symbol: Symbol, val name: Option[Name], val prefix: Type)
   end UnusedData
   extension (sym: Symbol)
     /** is accessible without import in current context */
@@ -742,11 +731,6 @@ object CheckUnused:
             && c.owner.thisType.baseClasses.contains(sym.owner)
             && c.owner.thisType.member(sym.name).alternatives.contains(sym)
 
-    def dealiasAsType(using Context): Symbol =
-      if sym.isType && sym.asType.denot.isAliasType then
-        sym.asType.typeRef.dealias.typeSymbol
-      else
-        sym
   extension (tp: Type)
     def importPrefix(using Context): Type = tp match
       case tp: NamedType => tp.prefix
