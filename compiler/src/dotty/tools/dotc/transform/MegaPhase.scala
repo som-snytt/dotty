@@ -170,7 +170,9 @@ class MegaPhase(val miniPhases: Array[MiniPhase]) extends Phase {
 
   private val cpy: TypedTreeCopier = cpyBetweenPhases
 
-  /** Transform node using all phases in this group that have idxInGroup >= start */
+  /** Transform node using all phases in this group that have idxInGroup >= start.
+   *  No op on EmptyTree.
+   */
   def transformNode(tree: Tree, start: Int)(using Context): Tree = {
     def goNamed(tree: Tree, start: Int) =
       try
@@ -192,6 +194,7 @@ class MegaPhase(val miniPhases: Array[MiniPhase]) extends Phase {
     def goUnnamed(tree: Tree, start: Int) =
       try
         tree match {
+          case EmptyTree => tree
           case tree: Apply => goApply(tree, start)
           case tree: TypeTree => goTypeTree(tree, start)
           case tree: Thicket =>
@@ -290,6 +293,7 @@ class MegaPhase(val miniPhases: Array[MiniPhase]) extends Phase {
     }
 
     def transformUnnamed(tree: Tree, start: Int, outerCtx: Context): Tree = tree match {
+      case EmptyTree => tree
       case tree: Apply =>
         inContext(prepApply(tree, start)(using outerCtx)) {
           val fun = transformTree(tree.fun, start)

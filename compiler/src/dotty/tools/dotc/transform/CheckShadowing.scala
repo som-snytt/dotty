@@ -95,7 +95,7 @@ class CheckShadowing extends MiniPhase:
       nestedTypeTraverser(tree.symbol).traverse(tree.rhs)
     if tree.symbol.is(Param) then // if param, the parent is up
       val owner = tree.symbol.owner
-      val parent = if (owner.isConstructor) then owner.owner else owner
+      val parent = if owner.isConstructor then owner.owner else owner
       nestedTypeTraverser(parent).traverse(tree.rhs)(using ctx.outer)
       shadowingDataApply(sd => sd.registerCandidate(parent, tree))
     else
@@ -141,7 +141,7 @@ class CheckShadowing extends MiniPhase:
 
     override def traverse(tree: tpd.Tree)(using Context): Unit =
       tree match
-        case t:tpd.TypeDef =>
+        case t: tpd.TypeDef =>
           val newCtx = shadowingDataApply(sd =>
             sd.registerCandidate(parent, t)
           )
@@ -157,7 +157,7 @@ class CheckShadowing extends MiniPhase:
 
     override def traverse(tree: tpd.Tree)(using Context): Unit =
       tree match
-        case t:tpd.Import =>
+        case t: tpd.Import =>
           val newCtx = shadowingDataApply(sd => sd.registerImport(t))
           traverseChildren(tree)(using newCtx)
         case _ =>
@@ -213,17 +213,15 @@ object CheckShadowing:
 
     /** Compute if there is some TypeParam shadowing and register if it is the case */
     def computeTypeParamShadowsFor(parent: Symbol)(using Context): Unit =
-        typeParamCandidates(parent).foreach(typeDef => {
-          val sym = typeDef.symbol
-          val shadowedType =
-            lookForRootShadowedType(sym)
-              .orElse(lookForImportedShadowedType(sym))
-              .orElse(lookForUnitShadowedType(sym))
-          shadowedType.foreach(shadowed =>
-            if !renamedImports.exists(_.contains(shadowed.name.toSimpleName)) then
-              typeParamShadowWarnings += TypeParamShadowWarning(typeDef.srcPos, typeDef.symbol, parent, shadowed)
-          )
-        })
+      for typeDef <- typeParamCandidates(parent) do
+        val sym = typeDef.symbol
+        val shadowedType =
+          lookForRootShadowedType(sym)
+            .orElse(lookForImportedShadowedType(sym))
+            .orElse(lookForUnitShadowedType(sym))
+        for shadowed <- shadowedType do
+          if !renamedImports.exists(_.contains(shadowed.name.toSimpleName)) then
+            typeParamShadowWarnings += TypeParamShadowWarning(typeDef.srcPos, typeDef.symbol, parent, shadowed)
 
     private def lookForRootShadowedType(symbol: Symbol)(using Context): Option[Symbol] =
       rootImports.find(p => p.name.toSimpleName == symbol.name.toSimpleName).map(_.symbol)

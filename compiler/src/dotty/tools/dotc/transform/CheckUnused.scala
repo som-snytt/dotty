@@ -37,23 +37,28 @@ class CheckUnused private (phaseMode: PhaseMode, suffix: String)(using Key) exte
 
   import UnusedData.*
 
+  var shallow = false
+
   private inline def ud(using ud: UnusedData): UnusedData = ud
 
-  private inline def prep[U](inline op: UnusedData ?=> U)(using ctx: Context): ctx.type =
+  private inline def prep[U](inline op: UnusedData ?=> U)(using ctx: Context): Context =
     ctx.property(summon[Key]) match
       case Some(ud) => op(using ud)
       case None     =>
     ctx
 
-  private inline def go[U](tree: Tree)(inline op: UnusedData ?=> U)(using ctx: Context): tree.type =
+  private inline def go[U](tree: Tree)(inline op: UnusedData ?=> U)(using ctx: Context): Tree =
     ctx.property(summon[Key]) match
       case Some(ud) => op(using ud)
       case None     =>
-    tree
+    if shallow then EmptyTree
+    else tree
 
   override def phaseName: String = CheckUnused.phaseNamePrefix + suffix
 
   override def description: String = CheckUnused.description
+
+  override def isEnabled(using Context): Boolean = ctx.settings.Wunused.value.nonEmpty
 
   override def isRunnable(using Context): Boolean =
     super.isRunnable && ctx.settings.Wunused.value.nonEmpty && !ctx.isJava
@@ -66,12 +71,12 @@ class CheckUnused private (phaseMode: PhaseMode, suffix: String)(using Key) exte
     )
     ctx.fresh.setProperty(key, data).tap(_ => tree.putAttachment(key, data))
 
-  override def transformUnit(tree: Tree)(using Context): tree.type = go(tree):
+  override def transformUnit(tree: Tree)(using Context) = go(tree):
     ud.finishAggregation()
     if phaseMode == PhaseMode.Report then
       ud.unusedAggregate.foreach(reportUnused)
 
-  override def transformIdent(tree: Ident)(using Context): tree.type = go(tree):
+  override def transformIdent(tree: Ident)(using Context) = go(tree):
     if tree.symbol.exists then
       def loopOnNormalizedPrefixes(prefix: Type, depth: Int): Unit =
         // limit to 10 as failsafe for the odd case where there is an infinite cycle
@@ -84,11 +89,11 @@ class CheckUnused private (phaseMode: PhaseMode, suffix: String)(using Key) exte
     else if tree.hasType then
       ud.registerUsed(tree.tpe.classSymbol, Some(tree.name), tree.tpe.importPrefix.skipPackageObject)
 
-  override def transformSelect(tree: Select)(using Context): tree.type = go(tree):
+  override def transformSelect(tree: Select)(using Context) = go(tree):
     val name = tree.removeAttachment(OriginalName)
     ud.registerUsed(tree.symbol, name, tree.qualifier.tpe, includeForImport = tree.qualifier.span.isSynthetic)
 
-  override def transformAssign(tree: Assign)(using Context): tree.type = go(tree):
+  override def transformAssign(tree: Assign)(using Context) = go(tree):
     val sym = tree.lhs.symbol
     if sym.exists then
       ud.registerSetVar(sym)
@@ -96,19 +101,19 @@ class CheckUnused private (phaseMode: PhaseMode, suffix: String)(using Key) exte
   override def prepareForBlock(tree: Block)(using Context): Context = prep:
     pushScope(tree)
 
-  override def transformBlock(tree: Block)(using Context): tree.type = go(tree):
+  override def transformBlock(tree: Block)(using Context) = go(tree):
     popScope(tree)
 
-  override def transformInlined(tree: Inlined)(using Context): tree.type = go(tree):
+  override def transformInlined(tree: Inlined)(using Context) = go(tree):
     traverser.traverseChildren(tree)
 
-  override def transformTypeTree(tree: TypeTree)(using Context): tree.type = go(tree):
+  override def transformTypeTree(tree: TypeTree)(using Context) = go(tree):
     if !tree.isInstanceOf[InferredTypeTree] then typeTraverser.traverse(tree.tpe)
 
   override def prepareForValDef(tree: ValDef)(using Context): Context = prep:
     ud.addIgnoredUsage(tree.symbol)
 
-  override def transformValDef(tree: ValDef)(using Context): tree.type = go(tree):
+  override def transformValDef(tree: ValDef)(using Context) = go(tree):
     traverseAnnotations(tree.symbol)
     if !tree.symbol.is(Module) then // do not register the ValDef generated for `object`
       ud.registerDef(tree)
@@ -144,20 +149,20 @@ class CheckUnused private (phaseMode: PhaseMode, suffix: String)(using Key) exte
       ud.registerDef(tree)
     ud.removeIgnoredUsage(tree.symbol)
 
-  override def transformBind(tree: Bind)(using Context): tree.type = go(tree):
+  override def transformBind(tree: Bind)(using Context) = go(tree):
     traverseAnnotations(tree.symbol)
     ud.registerPatVar(tree)
 
   override def prepareForTemplate(tree: Template)(using Context): Context = prep:
     pushScope(tree)
 
-  override def transformTemplate(tree: Template)(using Context): tree.type = go(tree):
+  override def transformTemplate(tree: Template)(using Context) = go(tree):
     popScope(tree)
 
   override def prepareForPackageDef(tree: PackageDef)(using Context): Context = prep:
     pushScope(tree)
 
-  override def transformPackageDef(tree: PackageDef)(using Context): tree.type = go(tree):
+  override def transformPackageDef(tree: PackageDef)(using Context) = go(tree):
     popScope(tree)
 
   override def prepareForStats(trees: List[Tree])(using Context): Context = ctx
@@ -165,11 +170,7 @@ class CheckUnused private (phaseMode: PhaseMode, suffix: String)(using Key) exte
   override def transformStats(trees: List[Tree])(using Context): List[Tree] =
     trees
 
-  //override def prepareForOther(tree: Tree)(using Context): Context = prep:
-  //  println(s"PREP ${tree.getClass}")
-
-  override def transformOther(tree: Tree)(using Context): tree.type = go(tree):
-    //println(s"TRAN ${tree.getClass}")
+  override def transformOther(tree: Tree)(using Context) = go(tree):
     tree match
     case imp: Import =>
       ud.registerImport(imp)
@@ -186,6 +187,14 @@ class CheckUnused private (phaseMode: PhaseMode, suffix: String)(using Key) exte
     case _ =>
       traverser.traverseChildren(tree)
 
+  // under shallow, returns empty tree to short-circuit phase pipeline
+  def transformShallow(tree: Tree)(using Context) =
+    val saved = shallow
+    shallow = true
+    try transformFollowing(tree)
+    finally shallow = saved
+    tree
+
   private def pushScope(tree: Block | Template | PackageDef)(using Context): Unit = prep:
     ud.pushScope(ScopeType.fromTree(tree))
 
@@ -198,7 +207,7 @@ class CheckUnused private (phaseMode: PhaseMode, suffix: String)(using Key) exte
 
   private class ChildFriendlyTreeTraverser extends TreeTraverser:
     override def traverseChildren(tree: Tree)(using Context): Unit = super.traverseChildren(tree)
-    override def traverse(tree: Tree)(using Context): Unit = transformAllDeep(tree)
+    override def traverse(tree: Tree)(using Context): Unit = transformShallow(tree)
   end ChildFriendlyTreeTraverser
 
   /** This is a type traverser which catch some special Types not traversed by the term traverser above */
