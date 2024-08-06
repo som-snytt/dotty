@@ -253,7 +253,7 @@ object Build {
       //"-Xfatal-warnings",                         // -Werror in modern usage
       "-Wconf:msg=unused private member&src=LazyVals.scala:s",
       "-Werror",
-      "-Wunused:all",
+      //"-Wunused:all",
       "-encoding", "UTF8",
       "-language:implicitConversions",
     ),

@@ -2,8 +2,9 @@ package dotty.tools.dotc
 package core
 package tasty
 
-import dotty.tools.tasty.{TastyBuffer, TastyReader}
-import TastyBuffer.NameRef
+import dotty.tools.tasty.TastyReader
+import dotty.tools.tasty.TastyBuffer.NameRef
+import dotty.tools.tasty.TastyFormat.ASTsSection
 
 import Names.TermName
 import StdNames.nme

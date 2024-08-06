@@ -8,7 +8,7 @@ import TastyBuffer.NameRef
 import Names.TermName
 import TastyUnpickler.*
 import util.Spans.offsetToInt
-import dotty.tools.tasty.TastyFormat.{ASTsSection, PositionsSection, CommentsSection}
+import dotty.tools.tasty.TastyFormat.{ASTsSection, AttributesSection, CommentsSection, PositionsSection}
 import java.nio.file.{Files, Paths}
 import dotty.tools.io.{JarArchive, Path}
 import scala.collection.immutable.BitSet

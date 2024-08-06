@@ -7,7 +7,7 @@ import scala.language.unsafeNulls
 
 import java.io.File as JFile
 import java.net.{URI, URL}
-import java.nio.file.{FileSystem, FileSystems, Files, Path, Paths}
+import java.nio.file.{FileSystem, FileSystemNotFoundException, FileSystems, Files, Path, Paths, ProviderNotFoundException}
 
 import dotty.tools.dotc.classpath.PackageNameUtils.{packageContains, separatePkgAndClassNames}
 import dotty.tools.io.{AbstractFile, PlainFile, ClassPath, ClassRepresentation, EfficientClassPath, JDK9Reflectors}

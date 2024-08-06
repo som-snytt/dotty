@@ -1,4 +1,4 @@
-//> using options -Wunused:imports -Ystop-after:checkUnusedPostInlining
+//> using options -Wunused:all -Ystop-after:checkUnusedPostInlining
 
 trait Schema[A]
 
@@ -60,3 +60,20 @@ object CC extends Coll.C
 import CC.*
 
 def `param type is imported`(map: HM[String, String]): Unit = println(map("hello, world"))
+
+object Constants:
+  final val i = 42
+def `old-style constants are usages`: Unit =
+  object Local:
+    final val j = 27
+  import Constants.i
+  println(i + Local.j)
+
+class `scope of super`:
+  import Constants.i // bad warn
+  class C(x: Int) {
+    def y = x
+  }
+  class D extends C(i):
+    import Constants.* // does not resolve i in C(i)
+    def m = i
