@@ -1,5 +1,4 @@
 package scala.annotation
-import annotation.experimental
 
 /** Marks an annotated class as a capability.
  *  If the annotation is present and -Ycc is set, any (possibly aliased

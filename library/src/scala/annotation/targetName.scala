@@ -5,4 +5,4 @@ package scala.annotation
  *  definition, its implementation will use the name `extname` instead of
  *  the regular name.
  */
-final class targetName(name: String) extends StaticAnnotation
+final class targetName(@unused name: String) extends StaticAnnotation

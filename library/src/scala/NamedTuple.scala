@@ -1,7 +1,6 @@
 package scala
-import scala.language.experimental.clauseInterleaving
 import annotation.experimental
-import compiletime.ops.boolean.*
+import language.experimental.clauseInterleaving
 
 @experimental
 object NamedTuple:

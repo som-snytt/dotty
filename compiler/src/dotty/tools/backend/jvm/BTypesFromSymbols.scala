@@ -4,8 +4,6 @@ package jvm
 
 import scala.tools.asm
 import scala.annotation.threadUnsafe
-import scala.collection.mutable
-import scala.collection.mutable.Clearable
 
 import dotty.tools.dotc.core.Flags.*
 import dotty.tools.dotc.core.Contexts.*
@@ -14,7 +12,6 @@ import dotty.tools.dotc.core.Symbols.*
 import dotty.tools.dotc.core.Phases.Phase
 
 import dotty.tools.dotc.core.StdNames
-import dotty.tools.dotc.core.Phases
 
 /**
  * This class mainly contains the method classBTypeFromSymbol, which extracts the necessary
@@ -149,7 +146,7 @@ class BTypesFromSymbols[I <: DottyBackendInterface](val int: I, val frontendAcce
       // like D is a member of C, not C$.
       val linkedClass = classSym.linkedClass
       val companionModuleMembers = {
-        if (classSym.linkedClass.isTopLevelModuleClass) getMemberClasses(classSym.linkedClass)
+        if (linkedClass.isTopLevelModuleClass) getMemberClasses(linkedClass)
         else Nil
       }
 
@@ -166,7 +163,7 @@ class BTypesFromSymbols[I <: DottyBackendInterface](val int: I, val frontendAcce
       if (s.is(JavaDefined) && s.is(ModuleClass)) {
         // We could also search in nestedClassSymbols for s.linkedClassOfClass, but sometimes that
         // returns NoSymbol, so it doesn't work.
-        val nb = nestedClassSymbols.count(mc => mc.name == s.name && mc.owner == s.owner)
+        //val nb = nestedClassSymbols.count(mc => mc.name == s.name && mc.owner == s.owner)
         // this assertion is specific to how ScalaC works. It doesn't apply to dotty, as n dotty there will be B & B$
         // assert(nb == 2, s"Java member module without member class: $s - $nestedClassSymbols")
         false

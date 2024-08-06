@@ -806,6 +806,7 @@ final class JSExportsGen(jsCodeGen: JSCodeGen)(using Context) {
   private def defaultGetterDenot(targetSym: Symbol, sym: Symbol, paramIndex: Int): Denotation =
     targetSym.info.memberBasedOnFlags(DefaultGetterName(sym.name.asTermName, paramIndex), excluded = Bridge)
 
+  @annotation.unused
   private def defaultGetterDenot(sym: Symbol, paramIndex: Int): Denotation =
     defaultGetterDenot(targetSymForDefaultGetter(sym), sym, paramIndex)
 

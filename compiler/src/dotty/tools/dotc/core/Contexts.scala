@@ -39,7 +39,6 @@ import dotty.tools.dotc.sbt.interfaces.{IncrementalCallback, ProgressCallback}
 import util.Property.Key
 import util.Store
 import plugins.*
-import java.util.concurrent.atomic.AtomicInteger
 import java.nio.file.InvalidPathException
 
 object Contexts {
@@ -930,11 +929,9 @@ object Contexts {
       FreshContext(ctx.base).init(ctx, ctx)
 
     private var inUse: Int = 0
-    private var pool = new mutable.ArrayBuffer[FreshContext]
+    private val pool = new mutable.ArrayBuffer[FreshContext]
 
     def next()(using Context): FreshContext =
-      val base = ctx.base
-      import base.*
       val nestedCtx =
         if inUse < pool.size then
           pool(inUse).reuseIn(ctx)

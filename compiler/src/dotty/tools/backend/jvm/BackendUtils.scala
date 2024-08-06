@@ -6,7 +6,6 @@ import scala.tools.asm.tree.InvokeDynamicInsnNode
 import asm.tree.ClassNode
 import scala.collection.mutable
 import scala.jdk.CollectionConverters.*
-import dotty.tools.dotc.report
 
 import scala.language.unsafeNulls
 

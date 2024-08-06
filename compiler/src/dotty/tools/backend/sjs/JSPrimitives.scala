@@ -92,6 +92,7 @@ class JSPrimitives(ictx: Context) extends DottyPrimitives(ictx) {
       primitives(s) = code
     }
 
+    @annotation.unused
     def addPrimitives(cls: Symbol, method: TermName, code: Int)(using Context): Unit = {
       val alts = cls.info.member(method).alternatives.map(_.symbol)
       if (alts.isEmpty) {

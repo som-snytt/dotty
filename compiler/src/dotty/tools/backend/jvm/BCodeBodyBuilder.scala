@@ -358,11 +358,10 @@ trait BCodeBodyBuilder extends BCodeSkelBuilder {
           val functionalInterface: Symbol =
             if !tpt.isEmpty then tpt.tpe.classSymbol
             else t.tpe.classSymbol
-          val (fun, args) = call match {
-            case Apply(fun, args) => (fun, args)
-            case t @ DesugaredSelect(_, _) => (t, Nil) // TODO: use Select
-            case t @ Ident(_) => (t, Nil)
-          }
+          val fun = call match
+            case Apply(fun, _) => fun
+            case t @ DesugaredSelect(_, _) => t // TODO: use Select
+            case t @ Ident(_) => t
 
           val savedStackSize = stack.recordSize()
           if (!fun.symbol.isStaticMember) {
@@ -993,7 +992,6 @@ trait BCodeBodyBuilder extends BCodeSkelBuilder {
 
         // Cases grouped by their hashCode
         val casesByHash = SortedMap.empty[Int, List[(String, Either[asm.Label, Tree])]]
-        var caseFallback: Tree = null
 
         for (caze @ CaseDef(pat, guard, body) <- cases) {
           assert(guard == tpd.EmptyTree, guard)
@@ -1055,7 +1053,7 @@ trait BCodeBodyBuilder extends BCodeSkelBuilder {
         for ((hashLabel, caseAlternatives) <- hashBlocks.reverse) {
           markProgramPoint(hashLabel)
           for ((caseString, indirectLblOrBody) <- caseAlternatives) {
-            val comparison = if (caseString == null) defn.Any_== else defn.Any_equals
+            //val comparison = if (caseString == null) defn.Any_== else defn.Any_equals
             val condp = Literal(Constant(caseString)).select(defn.Any_==).appliedTo(tree.selector)
             val keepGoing = new asm.Label
             indirectLblOrBody match {
@@ -1764,13 +1762,13 @@ trait BCodeBodyBuilder extends BCodeSkelBuilder {
           asmMethodType(lambdaTarget).descriptor,
           /* itf = */ isInterface)
 
-      val (a,b) = lambdaTarget.info.firstParamTypes.splitAt(environmentSize)
-      var (capturedParamsTypes, lambdaParamTypes) = (a,b)
+      val (cPT0, lambdaParamTypes) = lambdaTarget.info.firstParamTypes.splitAt(environmentSize)
+      var capturedParamsTypes = cPT0
 
       if (invokeStyle != asm.Opcodes.H_INVOKESTATIC) capturedParamsTypes = lambdaTarget.owner.info :: capturedParamsTypes
 
       // Requires https://github.com/scala/scala-java8-compat on the runtime classpath
-      val returnUnit = lambdaTarget.info.resultType.typeSymbol == defn.UnitClass
+      //val returnUnit = lambdaTarget.info.resultType.typeSymbol == defn.UnitClass
       val functionalInterfaceDesc: String = generatedType.descriptor
       val desc = capturedParamsTypes.map(tpe => toTypeKind(tpe)).mkString(("("), "", ")") + functionalInterfaceDesc
       // TODO specialization

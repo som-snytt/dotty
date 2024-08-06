@@ -657,6 +657,7 @@ object SourceCode {
     private def printTrees(trees: List[Tree], sep: String)(using elideThis: Option[Symbol]): this.type =
       printList(trees, sep, (t: Tree) => printTree(t))
 
+    @annotation.unused
     private def printTypeTrees(trees: List[TypeTree], sep: String)(using elideThis: Option[Symbol] = None): this.type =
       printList(trees, sep, (t: TypeTree) => printTypeTree(t))
 
@@ -1269,6 +1270,7 @@ object SourceCode {
             this += "given"
     }
 
+    @annotation.unused
     private def printDefinitionName(tree: Definition): this.type = tree match {
       case ValDef(name, _, _) => this += highlightValDef(name)
       case DefDef(name, _, _, _) => this += highlightValDef(name)

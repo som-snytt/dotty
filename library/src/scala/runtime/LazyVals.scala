@@ -8,7 +8,7 @@ import scala.annotation.*
  * Helper methods used in thread-safe lazy vals.
  */
 object LazyVals {
-  @nowarn
+  //@nowarn
   private val unsafe: sun.misc.Unsafe = {
     def throwInitializationException() =
       throw new ExceptionInInitializerError(

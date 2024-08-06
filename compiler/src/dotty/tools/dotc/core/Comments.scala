@@ -2,9 +2,10 @@ package dotty.tools
 package dotc
 package core
 
+import scala.annotation.unused
 import scala.language.unsafeNulls
 
-import ast.{ untpd, tpd }
+import ast.{untpd, tpd}
 import Symbols.*, Contexts.*
 import util.{SourceFile, ReadOnlyMap}
 import util.Spans.*
@@ -99,7 +100,7 @@ object Comments {
      *  def foo: A = ???
      *  }}}
      */
-    private def decomposeUseCase(body: String, span: Span, start: Int, end: Int)(using Context): UseCase = {
+    private def decomposeUseCase(body: String, span: Span, start: Int, @unused end: Int)(using Context): UseCase = {
       def subPos(start: Int, end: Int) =
         if (span == NoSpan) NoSpan
         else {
@@ -173,11 +174,10 @@ object Comments {
 
     private def defines(raw: String): List[String] = {
       val sections = tagIndex(raw)
-      val defines = sections filter { startsWithTag(raw, _, "@define") }
-      val usecases = sections filter { startsWithTag(raw, _, "@usecase") }
-      val end = startTag(raw, (defines ::: usecases).sortBy(_._1))
-
-      defines map { case (start, end) => raw.substring(start, end) }
+      val defines = sections.filter(startsWithTag(raw, _, "@define"))
+      defines.map((start, end) => raw.substring(start, end))
+      //val usecases = sections filter { startsWithTag(raw, _, "@usecase") }
+      //val end = startTag(raw, (defines ::: usecases).sortBy(_._1))
     }
 
     private def replaceInheritDocToInheritdoc(docStr: String): String  =
@@ -220,10 +220,10 @@ object Comments {
     def merge(src: String, dst: String, sym: Symbol, copyFirstPara: Boolean = false): String = {
       val srcSections  = tagIndex(src)
       val dstSections  = tagIndex(dst)
-      val srcParams    = paramDocs(src, "@param", srcSections)
-      val dstParams    = paramDocs(dst, "@param", dstSections)
-      val srcTParams   = paramDocs(src, "@tparam", srcSections)
-      val dstTParams   = paramDocs(dst, "@tparam", dstSections)
+      @unused val srcParams    = paramDocs(src, "@param", srcSections)
+      @unused val dstParams    = paramDocs(dst, "@param", dstSections)
+      @unused val srcTParams   = paramDocs(src, "@tparam", srcSections)
+      @unused val dstTParams   = paramDocs(dst, "@tparam", dstSections)
       val out          = new StringBuilder
       var copied       = 0
       var tocopy       = startTag(dst, dstSections dropWhile (!isMovable(dst, _)))
@@ -236,7 +236,7 @@ object Comments {
         tocopy = 3
       }
 
-      def mergeSection(srcSec: Option[(Int, Int)], dstSec: Option[(Int, Int)]) = dstSec match {
+      @unused def mergeSection(srcSec: Option[(Int, Int)], dstSec: Option[(Int, Int)]) = dstSec match {
         case Some((start, end)) =>
           if (end > tocopy) tocopy = end
         case None =>
@@ -456,6 +456,6 @@ object Comments {
       else sym.allOverriddenSymbols.toList.filter(_ != NoSymbol) //TODO: could also be `sym.owner.allOverrid..`
       //else sym.owner.ancestors map (sym overriddenSymbol _) filter (_ != NoSymbol)
 
-    class ExpansionLimitExceeded(str: String) extends Exception
+    class ExpansionLimitExceeded(str: String) extends Exception(str)
   }
 }

@@ -49,6 +49,4 @@ package internal
  *  4. At PostTyper, issue an error when encountering any reference to a CB companion.
  */
 @experimental
-class WitnessNames(names: String*) extends StaticAnnotation
-
-
+class WitnessNames(@unused names: String*) extends StaticAnnotation

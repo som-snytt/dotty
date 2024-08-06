@@ -301,6 +301,7 @@ object Extractors {
       def ++=(x: List[TypeRepr]): self.type = { visitList(x, visitType); buff }
     }
 
+    @annotation.unused
     private implicit class SignatureOps(buff: self.type) {
       def +=(x: Option[Signature]): self.type = { visitOption(x, visitSignature); buff }
     }

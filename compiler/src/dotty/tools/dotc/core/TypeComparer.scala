@@ -2,12 +2,14 @@ package dotty.tools
 package dotc
 package core
 
-import Types.*, Contexts.*, Symbols.*, Flags.*, Names.*, NameOps.*, Denotations.*
+import scala.annotation.unused
+import scala.collection.mutable.ListBuffer
+import scala.util.control.NonFatal
+
+import Types.*, Contexts.*, Symbols.*, Flags.*, Names.*, Denotations.*
 import Decorators.*
 import Phases.{gettersPhase, elimByNamePhase}
 import StdNames.nme
-import TypeOps.refineUsingParent
-import collection.mutable
 import util.{Stats, NoSourcePosition, EqHashMap}
 import config.Config
 import config.Feature.{betterMatchTypeExtractorsEnabled, migrateTo3, sourceVersion}
@@ -17,7 +19,6 @@ import TypeErasure.{erasedLub, erasedGlb}
 import TypeApplications.*
 import Variances.{Variance, variancesConform}
 import Constants.Constant
-import scala.util.control.NonFatal
 import typer.ProtoTypes.constrained
 import typer.Applications.productSelectorTypes
 import reporting.trace
@@ -1873,7 +1874,7 @@ class TypeComparer(@constructorOnly initctx: Context) extends ConstraintHandling
    *   - the type parameters of `B` match one-by-one the variances of `tparams`,
    *   - `B` satisfies predicate `p`.
    */
-  private def testLifted(tp1: Type, tp2: Type, tparams: List[TypeParamInfo], p: Type => Boolean): Boolean = {
+  @unused private def testLifted(tp1: Type, tp2: Type, tparams: List[TypeParamInfo], p: Type => Boolean): Boolean = {
     val classBounds = tp2.classSymbols
     def recur(bcs: List[ClassSymbol]): Boolean = bcs match {
       case bc :: bcs1 =>
@@ -2163,7 +2164,7 @@ class TypeComparer(@constructorOnly initctx: Context) extends ConstraintHandling
       def qualifies(m: SingleDenotation): Boolean =
         val info2 = tp2.refinedInfo
         val isExpr2 = info2.isInstanceOf[ExprType]
-        var info1 = m.info match
+        val info1 = m.info match
           case info1: ValueType if isExpr2 || m.symbol.is(Mutable) =>
             // OK: { val x: T } <: { def x: T }
             // OK: { var x: T } <: { def x: T }
@@ -2763,7 +2764,7 @@ class TypeComparer(@constructorOnly initctx: Context) extends ConstraintHandling
   }
 
   /** A comparison function to pick a winner in case of a merge conflict */
-  private def isAsGood(tp1: Type, tp2: Type): Boolean = tp1 match {
+  @unused private def isAsGood(tp1: Type, tp2: Type): Boolean = tp1 match {
     case tp1: ClassInfo =>
       tp2 match {
         case tp2: ClassInfo =>
@@ -3552,7 +3553,7 @@ class MatchReducer(initctx: Context) extends TypeComparer(initctx) {
     // See https://docs.scala-lang.org/sips/match-types-spec.html#matching
     def matchSpeccedPatMat(spec: MatchTypeCaseSpec.SpeccedPatMat): MatchResult =
       val instances = Array.fill[Type](spec.captureCount)(NoType)
-      val noInstances = mutable.ListBuffer.empty[(TypeName, TypeBounds)]
+      val noInstances = ListBuffer.empty[(TypeName, TypeBounds)]
 
       def rec(pattern: MatchTypeCasePattern, scrut: Type, variance: Int, scrutIsWidenedAbstract: Boolean): Boolean =
         pattern match

@@ -7,7 +7,6 @@ import Types.*, Contexts.*, Symbols.*, Flags.*, Decorators.*
 import Names.{Name, TermName}
 import Constants.Constant
 
-import Names.Name
 import config.Feature
 
 class TypeUtils:

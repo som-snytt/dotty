@@ -18,8 +18,7 @@ import printing.Texts.*
 import printing.Printer
 import SymDenotations.NoDenotation
 
-import collection.mutable
-import scala.compiletime.uninitialized
+import collection.mutable.{ArrayBuffer, ListBuffer}
 
 object Scopes {
 
@@ -240,7 +239,7 @@ object Scopes {
     /** Clone scope, taking care not to force the denotations of any symbols in the scope.
      */
     def cloneScope(using Context): MutableScope = {
-      val entries = new mutable.ArrayBuffer[ScopeEntry]
+      val entries = new ArrayBuffer[ScopeEntry]
       var e = lastEntry
       while ((e != null) && e.owner == this) {
         entries += e
@@ -418,7 +417,7 @@ object Scopes {
 
     override def implicitDecls(using Context): List[TermRef] = {
       ensureComplete()
-      var irefs = new mutable.ListBuffer[TermRef]
+      val irefs = new ListBuffer[TermRef]
       var e = lastEntry
       while (e != null) {
         if (e.sym.isOneOf(GivenOrImplicitVal)) {

@@ -1,7 +1,6 @@
 package dotty.tools.dotc
 package core
 
-import core.*
 import Types.*
 import Contexts.*
 import Symbols.*

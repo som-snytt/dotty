@@ -3,25 +3,23 @@ package dotc
 package core
 package classfile
 
+import scala.annotation.unused
 import scala.language.unsafeNulls
-
-import dotty.tools.tasty.{ TastyReader, TastyHeaderUnpickler }
 
 import Contexts.*, Symbols.*, Types.*, Names.*, StdNames.*, NameOps.*, Scopes.*, Decorators.*
 import SymDenotations.*, unpickleScala2.Scala2Unpickler.*, Constants.*, Annotations.*, util.Spans.*
 import Phases.*
-import ast.{ tpd, untpd }
 import ast.tpd.*, util.*
+import ast.untpd
 import java.io.IOException
 
 import java.lang.Integer.toHexString
-import java.util.UUID
 
 import scala.collection.immutable
 import scala.collection.mutable.{ ListBuffer, ArrayBuffer }
 import scala.annotation.switch
 import typer.Checking.checkNonCyclic
-import io.{AbstractFile, ZipArchive}
+import io.AbstractFile
 import scala.util.control.NonFatal
 import dotty.tools.dotc.classpath.FileUtils.hasSiblingTasty
 
@@ -283,7 +281,7 @@ class ClassfileParser(
   protected var currentClassName: SimpleName = uninitialized // JVM name of the current class
   protected var classTParams: Map[Name, Symbol] = Map()
 
-  private var Scala2UnpicklingMode = Mode.Scala2Unpickling
+  private val Scala2UnpicklingMode = Mode.Scala2Unpickling
   private var classfileVersion: Header.Version = Header.Version.Unknown
 
   classRoot.info = NoLoader().withDecls(instanceScope)
@@ -354,7 +352,6 @@ class ClassfileParser(
     val jflags       = in.nextChar
     val isAnnotation = hasAnnotation(jflags)
     val sflags       = classTranslation.flags(jflags)
-    val isEnum       = (jflags & JAVA_ACC_ENUM) != 0
     val nameIdx      = in.nextChar
     currentClassName = pool.getClassName(nameIdx).name
 
@@ -379,7 +376,7 @@ class ClassfileParser(
         else
           pool.getSuperClass(in.nextChar).typeRef
       val ifaceCount = in.nextChar
-      var ifaces = for (i <- (0 until ifaceCount).toList) yield pool.getSuperClass(in.nextChar).typeRef
+      val ifaces = for (i <- (0 until ifaceCount).toList) yield pool.getSuperClass(in.nextChar).typeRef
         // Dotty deviation: was
         //    var ifaces = for (i <- List.range(0, ifaceCount)) ...
         // This does not typecheck because the type parameter of List is now lower-bounded by Int | Char.
@@ -432,6 +429,7 @@ class ClassfileParser(
 
     result
   }
+  end parseClass
 
   /** Add type parameters of enclosing classes */
   def addEnclosingTParams()(using Context): Unit = {
@@ -669,7 +667,7 @@ class ClassfileParser(
           end isRepeatedParam
 
           val paramtypes = new ListBuffer[Type]()
-          var paramnames = new ListBuffer[TermName]()
+          val paramnames = new ListBuffer[TermName]()
           while !isMethodEnd(index) do
             paramnames += nme.syntheticParamName(paramtypes.length)
             paramtypes += {
@@ -735,7 +733,6 @@ class ClassfileParser(
     if (sig(index) == '<') {
       assert(owner != null)
       index += 1
-      val start = index
       while (sig(index) != '>') {
         val tpname = subName(':'.==).toTypeName
         val s = newSymbol(
@@ -780,7 +777,7 @@ class ClassfileParser(
 
     // ... but constants need to actually be typed with a ConstantType, so we
     // can't rely on type inference, and type them early.
-    def lit(c: Constant): untpd.Tree = untpd.TypedSplice(tpd.Literal(c))
+    def lit(c: Constant): untpd.Tree = untpd.TypedSplice(Literal(c))
 
     val tag = in.nextByte.toChar
     val index = in.nextChar
@@ -1167,7 +1164,7 @@ class ClassfileParser(
         if !scan(tpnme.RuntimeVisibleAnnotationATTR) then
           report.error(em"No RuntimeVisibleAnnotations in classfile with ScalaSignature attribute: ${classRoot.fullName}")
           return None
-        val attrLen = in.nextInt
+        @unused val attrLen = in.nextInt
         val nAnnots = in.nextChar
         var i = 0
         while (i < nAnnots) {
@@ -1190,7 +1187,7 @@ class ClassfileParser(
       }
 
       if (scan(tpnme.InnerClassesATTR)) {
-        val attrLen = in.nextInt
+        @unused val attrLen = in.nextInt
         val entries = in.nextChar.toInt
         for (i <- 0 until entries) {
           val innerIndex = in.nextChar
@@ -1314,7 +1311,7 @@ class ClassfileParser(
     else
       NoSymbol
 
-  private def isPrivate(flags: Int)     = (flags & JAVA_ACC_PRIVATE) != 0
+  @unused private def isPrivate(flags: Int)     = (flags & JAVA_ACC_PRIVATE) != 0
   private def isStatic(flags: Int)      = (flags & JAVA_ACC_STATIC) != 0
   private def hasAnnotation(flags: Int) = (flags & JAVA_ACC_ANNOTATION) != 0
 

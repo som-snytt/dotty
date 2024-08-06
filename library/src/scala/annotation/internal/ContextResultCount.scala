@@ -6,4 +6,4 @@ package internal
  *  The parameter `n` is an Int Literal that tells how many nested closures
  *  there are.
  */
-class ContextResultCount(n: Int) extends StaticAnnotation
+class ContextResultCount(@unused n: Int) extends StaticAnnotation

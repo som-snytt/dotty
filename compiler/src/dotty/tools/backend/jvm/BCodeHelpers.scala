@@ -31,7 +31,6 @@ import dotty.tools.dotc.core.Types.*
 import dotty.tools.dotc.core.TypeErasure
 import dotty.tools.dotc.transform.GenericSignatures
 import dotty.tools.dotc.transform.ElimErasedValueType
-import dotty.tools.io.AbstractFile
 import dotty.tools.dotc.report
 
 import dotty.tools.backend.jvm.DottyBackendInterface.symExtensions
@@ -49,7 +48,7 @@ trait BCodeHelpers extends BCodeIdiomatic {
   import bTypes.*
   import tpd.*
   import coreBTypes.*
-  import int.{_, given}
+  import int.given
   import DottyBackendInterface.*
 
   // We need to access GenBCode phase to get access to post-processor components.
@@ -305,7 +304,7 @@ trait BCodeHelpers extends BCodeIdiomatic {
           toDenot(fun.symbol).owner == defn.ArrayClass.linkedClass && fun.symbol.name == nme.apply =>
           val arrAnnotV: AnnotationVisitor = av.visitArray(name)
 
-          var actualArgs = if (fun.tpe.isImplicitMethod) {
+          val actualArgs = if (fun.tpe.isImplicitMethod) {
             // generic array method, need to get implicit argument out of the way
             fun.asInstanceOf[Apply].args
           } else args
@@ -596,7 +595,7 @@ trait BCodeHelpers extends BCodeIdiomatic {
       assert(moduleClass.companionClass == NoSymbol, moduleClass)
       this.cunit = cunit
       val bType      = mirrorClassBTypeFromSymbol(moduleClass)
-      val moduleName = internalName(moduleClass) // + "$"
+      //val moduleName = internalName(moduleClass) // + "$"
       val mirrorName = bType.internalName
 
       val mirrorClass = new asm.tree.ClassNode
@@ -766,7 +765,7 @@ trait BCodeHelpers extends BCodeIdiomatic {
     }
   }
 
-  private def getGenericSignatureHelper(sym: Symbol, owner: Symbol, memberTpe: Type)(using Context): Option[String] = {
+  private def getGenericSignatureHelper(sym: Symbol, @annotation.unused owner: Symbol, memberTpe: Type)(using Context): Option[String] = {
     if (needsGenericSignature(sym)) {
       val erasedTypeSym = TypeErasure.fullErasure(sym.denot.info).typeSymbol
       if (erasedTypeSym.isPrimitiveValueClass) {

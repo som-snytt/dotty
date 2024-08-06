@@ -29,7 +29,7 @@ object init:
    *  it is forbidden to call methods or access fields on cold values.
    */
   @experimental
-  final class widen(height: Int) extends StaticAnnotation
+  final class widen(@unused height: Int) extends StaticAnnotation
 
   /** Introduce a region context.
    *

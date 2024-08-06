@@ -185,7 +185,7 @@ object Plugins {
     // propagate ordering constraint : reflexivity
     pluginPhases.foreach { phase =>
 
-      var (runsAfter, runsBefore) = orderRequirements(phase.phaseName)
+      val (runsAfter, runsBefore) = orderRequirements(phase.phaseName)
 
       // propagate transitive constraints to related phases
       runsAfter.filter(!isInserted(_)).foreach { phaseName =>
@@ -237,7 +237,7 @@ object Plugins {
     }
 
     pluginPhases.sortBy(_.phaseName).foreach { phase =>
-      var (runsAfter1, runsBefore1) = propagate(phase)
+      val (runsAfter1, runsBefore1) = propagate(phase)
 
       debug(
         s"""propagated constraints for ${phase}:

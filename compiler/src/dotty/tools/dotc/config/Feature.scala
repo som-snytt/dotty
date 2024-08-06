@@ -3,15 +3,14 @@ package dotc
 package config
 
 import core.*
+import reporting.Message
+import util.SrcPos
 import Contexts.*, Symbols.*, Names.*
 import StdNames.nme
 import Decorators.*
-import util.{SrcPos, NoSourcePosition}
 import SourceVersion.*
-import reporting.Message
 import NameKinds.QualifiedName
 import Annotations.ExperimentalAnnotation
-import Settings.Setting.ChoiceWithHelp
 
 object Feature:
 

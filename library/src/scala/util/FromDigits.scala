@@ -1,7 +1,6 @@
 package scala.util
-import scala.math.{BigInt}
-import quoted.*
-import annotation.internal.sharable
+import scala.annotation.internal.sharable
+import scala.math.BigInt
 
 
 /** A type class for types that admit numeric literals.

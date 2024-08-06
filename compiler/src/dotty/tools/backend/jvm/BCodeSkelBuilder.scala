@@ -29,7 +29,7 @@ import dotty.tools.dotc.report
  *
  */
 trait BCodeSkelBuilder extends BCodeHelpers {
-  import int.{_, given}
+  import int.given
   import DottyBackendInterface.{symExtensions, _}
   import tpd.*
   import bTypes.*
@@ -303,7 +303,7 @@ trait BCodeSkelBuilder extends BCodeHelpers {
     /*
      * must-single-thread
      */
-    private def initJClass(jclass: asm.ClassVisitor): Unit = {
+    private def initJClass(@annotation.unused jclass: asm.ClassVisitor): Unit = {
 
       val ps = claszSymbol.info.parents
       val superClass: String = if (ps.isEmpty) ObjectRef.internalName else internalName(ps.head.typeSymbol)
@@ -639,7 +639,7 @@ trait BCodeSkelBuilder extends BCodeHelpers {
 
     // on entering a method
     def resetMethodBookkeeping(dd: DefDef) = {
-      val rhs = dd.rhs
+      //val rhs = dd.rhs
       locals.reset(isStaticMethod = methSymbol.isStaticMember)
       jumpDest = immutable.Map.empty
 
@@ -930,7 +930,7 @@ trait BCodeSkelBuilder extends BCodeHelpers {
      *
      *  TODO document, explain interplay with `fabricateStaticInitAndroid()`
      */
-    private def appendToStaticCtor(dd: DefDef): Unit = {
+    private def appendToStaticCtor(@annotation.unused dd: DefDef): Unit = {
 
       def insertBefore(
             location: asm.tree.AbstractInsnNode,

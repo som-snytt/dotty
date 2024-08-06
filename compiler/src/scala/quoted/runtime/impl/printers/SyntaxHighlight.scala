@@ -17,6 +17,7 @@ object SyntaxHighlight {
   def ANSI: SyntaxHighlight = new SyntaxHighlight {
     // Keep in sync with SyntaxHighlighting
     private val NoColor         = Console.RESET
+    @annotation.unused
     private val CommentColor    = Console.BLUE
     private val KeywordColor    = Console.YELLOW
     private val ValDefColor     = Console.CYAN

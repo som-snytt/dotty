@@ -7,11 +7,11 @@ import Contexts.*
 import Symbols.*
 import SymDenotations.LazyType
 import Decorators.*
-import util.Stats.*
 import Names.*
-import StdNames.nme
-import Flags.{Module, Provisional}
+import Flags.Module
+import util.Stats.*
 import dotty.tools.dotc.config.Config
+import scala.annotation.unused
 
 object TypeApplications {
 
@@ -370,7 +370,7 @@ class TypeApplications(val self: Type) extends AnyVal {
    */
   final def appliedTo(args: List[Type])(using Context): Type = {
     record("appliedTo")
-    val typParams = self.typeParams
+    @unused val typParams = self.typeParams
     val stripped = self.stripTypeVar
     val dealiased = stripped.safeDealias
     if (args.isEmpty || ctx.erasedTypes) self

@@ -14,9 +14,7 @@ import reporting.*
 import ast.untpd
 import util.Property
 import config.Printers.{cyclicErrors, noPrinter}
-import collection.mutable
-
-import scala.annotation.constructorOnly
+import collection.mutable.{ArrayBuffer, ListBuffer}
 
 abstract class TypeError(using creationContext: Context) extends Exception(""):
 
@@ -89,7 +87,7 @@ extends TypeError:
   def explanation: String = s"$op $details"
 
   private def recursions: List[RecursionOverflow] = {
-    val result = mutable.ListBuffer.empty[RecursionOverflow]
+    val result = ListBuffer.empty[RecursionOverflow]
     @annotation.tailrec def loop(throwable: Throwable): List[RecursionOverflow] = throwable match {
       case ro: RecursionOverflow =>
         result += ro
@@ -212,7 +210,7 @@ object CyclicReference:
     ex
 
   type TraceElement = Context ?=> String
-  type Trace = mutable.ArrayBuffer[TraceElement]
+  type Trace = ArrayBuffer[TraceElement]
   val Trace = Property.Key[Trace]
 
   private def isTraced(using Context) =

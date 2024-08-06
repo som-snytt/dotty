@@ -7,7 +7,6 @@ import Contexts.*
 import Names.*
 import NameKinds.*
 import StdNames.*
-import Symbols.NoSymbol
 import Symbols.*
 import Types.*
 import Periods.*
@@ -17,12 +16,10 @@ import Decorators.*
 import Signature.MatchDegree.*
 import printing.Texts.*
 import printing.Printer
-import io.AbstractFile
 import config.Config
 import config.Printers.overload
 import util.common.*
 import typer.ProtoTypes.NoViewsAllowed
-import reporting.Message
 import collection.mutable.ListBuffer
 
 import scala.compiletime.uninitialized
@@ -997,7 +994,7 @@ object Denotations {
 
     /** Show all defined periods and the info of the denotation at each */
     def definedPeriodsString(using Context): String = {
-      var sb = new StringBuilder()
+      val sb = StringBuilder()
       var cur = this
       var cnt = 0
       while

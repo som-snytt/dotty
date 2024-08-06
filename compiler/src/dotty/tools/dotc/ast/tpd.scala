@@ -5,9 +5,8 @@ package ast
 import dotty.tools.dotc.transform.{ExplicitOuter, Erasure}
 import typer.ProtoTypes
 import core.*
-import Scopes.newScope
 import util.Spans.*, Types.*, Contexts.*, Constants.*, Names.*, Flags.*, NameOps.*
-import Symbols.*, StdNames.*, Annotations.*, Trees.*, Symbols.*
+import StdNames.*, Annotations.*, Trees.*, Symbols.*
 import Decorators.*, DenotTransformers.*
 import collection.{immutable, mutable}
 import util.{Property, SourceFile}
@@ -122,7 +121,7 @@ object tpd extends Trees.Instance[Type] with TypedTreeInfo {
     val call =
       if (targs.isEmpty) Ident(TermRef(NoPrefix, meth))
       else TypeApply(Ident(TermRef(NoPrefix, meth)), targs)
-    var mdef0 = DefDef(meth, rhsFn)
+    val mdef0 = DefDef(meth, rhsFn)
     val mdef = cpy.DefDef(mdef0)(tpt = TypeTree(mdef0.tpt.tpe, inferred = true))
     Block(mdef :: Nil, Closure(Nil, call, targetTpt))
   }
@@ -482,7 +481,6 @@ object tpd extends Trees.Instance[Type] with TypedTreeInfo {
    *  `length` arguments are given.
    */
   def newArray(elemTpe: Type, returnTpe: Type, span: Span, dims: JavaSeqLiteral)(using Context): Tree = {
-    val elemClass = elemTpe.classSymbol
     def newArr =
       ref(defn.DottyArraysModule).select(defn.newArrayMethod).withSpan(span)
 

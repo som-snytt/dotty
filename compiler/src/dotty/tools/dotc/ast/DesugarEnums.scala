@@ -10,8 +10,6 @@ import util.{Property, SourceFile}
 import typer.ErrorReporting.*
 import transform.SyntheticMembers.ExtendsSingletonMirror
 
-import scala.annotation.internal.sharable
-
 /** Helper methods to desugar enums */
 object DesugarEnums {
   import untpd.*

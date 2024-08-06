@@ -14,12 +14,11 @@ import ast.{untpd, tpd}
 import Contexts.*, Symbols.*, Types.*, Names.*, Constants.*, Decorators.*, Annotations.*, Flags.*
 import Comments.{Comment, docCtx}
 import NameKinds.*
-import StdNames.{nme, tpnme}
+import StdNames.nme
 import config.Config
 import collection.mutable
 import reporting.{Profile, NoProfile}
 import dotty.tools.tasty.TastyFormat.ASTsSection
-import quoted.QuotePatterns
 
 object TreePickler:
   class StackSizeExceeded(val mdef: tpd.MemberDef) extends Exception
@@ -470,7 +469,7 @@ class TreePickler(pickler: TastyPickler, attributes: Attributes) {
                 val sig =
                   if name == nme.CONSTRUCTOR && tree.symbol.exists && tree.symbol.owner.is(JavaAnnotation) then Signature.NotAMethod
                   else tree.tpe.signature
-                var ename = tree.symbol.targetName
+                val ename = tree.symbol.targetName
                 val selectFromQualifier =
                   name.isTypeName
                   || qual.isInstanceOf[Hole] // holes have no symbol
@@ -845,7 +844,7 @@ class TreePickler(pickler: TastyPickler, attributes: Attributes) {
     if (flags.is(ParamAccessor) && sym.isTerm && !sym.isSetter)
       flags = flags &~ ParamAccessor // we only generate a tag for parameter setters
     pickleFlags(flags, sym.isTerm)
-    val annots = sym.annotations.foreach(pickleAnnotation(sym, mdef, _))
+    sym.annotations.foreach(pickleAnnotation(sym, mdef, _))
   }
 
   def pickleFlags(flags: FlagSet, isTerm: Boolean)(using Context): Unit = {

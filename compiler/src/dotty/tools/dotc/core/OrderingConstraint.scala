@@ -443,7 +443,7 @@ class OrderingConstraint(private val boundsMap: ParamBounds,
   def depsToString(using Context): String =
     def depsStr(deps: ReverseDeps): String =
       def depStr(param: TypeParamRef) = i"$param --> ${deps.at(param).toList}%, %"
-      if deps.isEmpty then "" else i"\n     ${deps.toList.map((k, v) => depStr(k))}%\n     %"
+      if deps.isEmpty then "" else i"\n     ${deps.toList.map((k, _) => depStr(k))}%\n     %"
     i" co-deps:${depsStr(coDeps)}\n contra-deps:${depsStr(contraDeps)}\n"
 
 // ---------- Adding TypeLambdas --------------------------------------------------

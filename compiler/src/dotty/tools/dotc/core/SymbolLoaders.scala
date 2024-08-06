@@ -5,6 +5,7 @@ package core
 import java.io.{IOException, File}
 import java.nio.channels.ClosedByInterruptException
 
+import scala.annotation.unused
 import scala.util.control.NonFatal
 
 import dotty.tools.dotc.classpath.FileUtils.{hasTastyExtension, hasBetastyExtension}
@@ -24,8 +25,7 @@ import ast.desugar
 
 import parsing.JavaParsers.OutlineJavaParser
 import parsing.Parsers.OutlineParser
-import dotty.tools.tasty.{TastyHeaderUnpickler, UnpickleException, UnpicklerConfig, TastyVersion}
-import dotty.tools.dotc.core.tasty.TastyUnpickler
+import dotty.tools.tasty.UnpickleException
 import dotty.tools.tasty.besteffort.BestEffortTastyHeaderUnpickler
 
 object SymbolLoaders {
@@ -104,8 +104,8 @@ object SymbolLoaders {
   def enterClassAndModule(
       owner: Symbol, name: PreName, completer: SymbolLoader,
       flags: FlagSet = EmptyFlags, scope: Scope = EmptyScope)(using Context): Unit = {
-    val clazz = enterClass(owner, name, completer, flags, scope)
-    val module = enterModule(
+    @unused val clazz = enterClass(owner, name, completer, flags, scope)
+    @unused val module = enterModule(
       owner, name, completer,
       modFlags = flags.toTermFlags & RetainedModuleValFlags,
       clsFlags = flags.toTypeFlags & RetainedModuleClassFlags,
@@ -473,7 +473,7 @@ class TastyLoader(val tastyFile: AbstractFile) extends SymbolLoader {
       // tasty file compiled by `-Xearly-tasty-output-write` comes from an early output jar.
       report.inform(s"No classfiles found for $tastyFile when checking TASTy UUID")
 
-  private def checkBeTastyUUID(tastyFile: AbstractFile, tastyBytes: Array[Byte])(using Context): Unit =
+  private def checkBeTastyUUID(@unused tastyFile: AbstractFile, tastyBytes: Array[Byte])(using Context): Unit =
     new BestEffortTastyHeaderUnpickler(tastyBytes).readHeader()
 
   private def mayLoadTreesFromTasty(using Context): Boolean =

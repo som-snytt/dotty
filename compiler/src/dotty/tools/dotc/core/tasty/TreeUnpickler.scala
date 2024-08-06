@@ -20,7 +20,6 @@ import Constants.*
 import Annotations.*
 import NameKinds.*
 import NamerOps.*
-import ContextOps.*
 import Variances.Invariant
 import TastyUnpickler.NameTable
 import typer.ConstFold
@@ -37,7 +36,7 @@ import quoted.QuotePatterns
 import dotty.tools.tasty.{TastyBuffer, TastyReader}
 import TastyBuffer.*
 
-import scala.annotation.{switch, tailrec}
+import scala.annotation.{switch, tailrec, unused}
 import scala.collection.mutable.ListBuffer
 import scala.collection.mutable
 import config.Printers.pickling
@@ -116,7 +115,7 @@ class TreeUnpickler(reader: TastyReader,
 
   /** This dependency was compiled with explicit nulls enabled */
   // TODO Use this to tag the symbols of this dependency as compiled with explicit nulls (see use of unpicklingScala2Library).
-  private val explicitNulls = attributes.explicitNulls
+  @unused private val explicitNulls = attributes.explicitNulls
 
   private val unpicklingJava = attributes.isJava
 
@@ -222,7 +221,7 @@ class TreeUnpickler(reader: TastyReader,
           if (mode == MemberDefsOnly) skipTree(tag)
           else if (tag >= firstLengthTreeTag) {
             val end = readEnd()
-            var nrefs = numRefs(tag)
+            val nrefs = numRefs(tag)
             if (nrefs < 0) {
               for (i <- nrefs until 0) scanTree(buf)
               goto(end)
@@ -383,7 +382,7 @@ class TreeUnpickler(reader: TastyReader,
         val result =
           (tag: @switch) match {
             case TERMREFin =>
-              var sname = readName()
+              val sname = readName()
               val prefix = readType()
               val owner = readType()
               sname match {
@@ -604,8 +603,8 @@ class TreeUnpickler(reader: TastyReader,
 
     private def createBindSymbol()(using Context): Symbol = {
       val start = currentAddr
-      val tag = readByte()
-      val end = readEnd()
+      @unused val tag = readByte()
+      @unused val end = readEnd()
       var name: Name = readName()
       if nextUnsharedTag == TYPEBOUNDS then name = name.toTypeName
       val typeReader = fork
@@ -1096,8 +1095,7 @@ class TreeUnpickler(reader: TastyReader,
       val constr =
         if nextByte == SPLITCLAUSE then
           assert(unpicklingJava, s"unexpected SPLITCLAUSE at $start")
-          val tag = readByte()
-          def ta = ctx.typeAssigner
+          @unused val tag = readByte()
           val flags = Flags.JavaDefined | Flags.PrivateLocal | Flags.Invisible
           val ctorCompleter = new LazyType {
             def complete(denot: SymDenotation)(using Context) =
@@ -1232,7 +1230,7 @@ class TreeUnpickler(reader: TastyReader,
       readIndexedStats(exprOwner, end, k)
     }
 
-    private def sameTrees(xs: List[Tree], ctx: Context) = xs
+    private def sameTrees(xs: List[Tree], @unused ctx: Context) = xs
 
     def readIndexedParams[T <: MemberDef](tag: Int)(using Context): List[T] =
       collectWhile(nextByte == tag) { readIndexedDef().asInstanceOf[T] }
@@ -1267,8 +1265,7 @@ class TreeUnpickler(reader: TastyReader,
       }
 
       def makeSelect(qual: Tree, name: Name, denot: Denotation): Select =
-        var qualType = qual.tpe.widenIfUnstable
-        val owner = denot.symbol.maybeOwner
+        val qualType = qual.tpe.widenIfUnstable
         val tpe0 = name match
           case name: TypeName => TypeRef(qualType, name, denot)
           case name: TermName => TermRef(qualType, name, denot)
@@ -1545,7 +1542,7 @@ class TreeUnpickler(reader: TastyReader,
               val levels = readNat()
               readTree().outerSelect(levels, SkolemType(readType()))
             case SELECTin =>
-              var sname = readName()
+              val sname = readName()
               val qual = readTree()
               val ownerTpe = readType()
               val owner = ownerTpe.typeSymbol

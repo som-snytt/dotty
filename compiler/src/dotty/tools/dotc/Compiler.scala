@@ -7,7 +7,6 @@ import typer.{TyperPhase, RefChecks}
 import parsing.Parser
 import Phases.Phase
 import transform.*
-import dotty.tools.backend
 import backend.jvm.{CollectSuperCalls, GenBCode}
 import localopt.StringInterpolatorOpt
 

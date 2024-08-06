@@ -226,7 +226,7 @@ class JSCodeGen()(using genCtx: Context) {
     /* Finally, we emit true code for the remaining class defs. */
     for (td <- otherTypeDefs) {
       val sym = td.symbol
-      implicit val pos: Position = sym.span
+      //implicit val pos: Position = sym.span
 
       /* Do not actually emit code for primitive types nor scala.Array. */
       val isPrimitive =
@@ -299,7 +299,7 @@ class JSCodeGen()(using genCtx: Context) {
     }
   }
 
-  private def getFileFor(cunit: CompilationUnit, className: ClassName,
+  private def getFileFor(@annotation.unused cunit: CompilationUnit, className: ClassName,
       suffix: String): dotty.tools.io.AbstractFile = {
     val outputDirectory = ctx.settings.outputDir.value
     val pathParts = className.nameString.split('.')
@@ -511,7 +511,7 @@ class JSCodeGen()(using genCtx: Context) {
     }
 
     val classIdent = encodeClassNameIdent(sym)
-    val originalName = originalNameOfClass(sym)
+    //val originalName = originalNameOfClass(sym)
 
     // Generate members (constructor + methods)
 
@@ -1258,7 +1258,7 @@ class JSCodeGen()(using genCtx: Context) {
 
   private def genParamsAndInfo(ctorSym: Symbol,
       vparamss: List[ParamClause]): List[(Symbol, JSParamInfo)] = {
-    implicit val pos: SourcePosition = ctorSym.sourcePos
+    //implicit val pos: SourcePosition = ctorSym.sourcePos
 
     val paramSyms = if (vparamss.isEmpty) Nil else vparamss.head.map(_.symbol)
     paramSyms.zip(ctorSym.jsParamInfos)
@@ -1666,6 +1666,7 @@ class JSCodeGen()(using genCtx: Context) {
   private def genParamDef(sym: Symbol, ptpe: jstpe.Type): js.ParamDef =
     genParamDef(sym, ptpe, sym.span)
 
+  @annotation.unused
   private def genParamDef(sym: Symbol, pos: Position): js.ParamDef =
     genParamDef(sym, toIRType(sym.info), pos)
 
@@ -1937,6 +1938,7 @@ class JSCodeGen()(using genCtx: Context) {
           case lhs: Select =>
             val qualifier = lhs.qualifier
 
+            @annotation.unused
             def ctorAssignment = (
                 currentMethodSym.get.name == nme.CONSTRUCTOR &&
                 currentMethodSym.get.owner == qualifier.symbol &&
@@ -2905,7 +2907,6 @@ class JSCodeGen()(using genCtx: Context) {
 
     if (mustUseAnyComparator) {
       val equalsMethod: Symbol = {
-        val ptfm = ctx.platform
         if (lsym.derivesFrom(defn.BoxedNumberClass)) {
           if (rsym.derivesFrom(defn.BoxedNumberClass)) externalEqualsNumNum
           else if (rsym.derivesFrom(defn.BoxedCharClass)) externalEqualsNumChar
@@ -3018,7 +3019,7 @@ class JSCodeGen()(using genCtx: Context) {
   }
 
   /** Gen JS code for a coercion */
-  private def genCoercion(tree: Apply, receiver: Tree, code: Int): js.Tree = {
+  private def genCoercion(tree: Apply, receiver: Tree, @annotation.unused code: Int): js.Tree = {
     implicit val pos = tree.span
 
     val source = genExpr(receiver)
@@ -3060,6 +3061,7 @@ class JSCodeGen()(using genCtx: Context) {
     val args = tree.args
     val sym = fun.symbol
 
+    @annotation.unused
     def isStringMethodFromObject: Boolean = sym.name match {
       case nme.toString_ | nme.equals_ | nme.hashCode_ => true
       case _                                           => false
@@ -3461,7 +3463,7 @@ class JSCodeGen()(using genCtx: Context) {
 
     val envSize = env.size
 
-    val (fun, args) = call match {
+    val (fun, _) = call match {
       // case Apply(fun, args) => (fun, args) // Conjectured not to happen
       case t @ Select(_, _) => (t, Nil)
       case t @ Ident(_) => (t, Nil)
@@ -4252,8 +4254,8 @@ class JSCodeGen()(using genCtx: Context) {
    *  This tries to optimize repeated arguments (varargs) by turning them
    *  into js.WrappedArray instead of Scala wrapped arrays.
    */
-  private def genActualArgs(sym: Symbol, args: List[Tree])(
-      implicit pos: Position): List[js.Tree] = {
+  private def genActualArgs(@annotation.unused sym: Symbol, args: List[Tree])(
+      implicit @annotation.unused pos: Position): List[js.Tree] = {
     args.map(genExpr)
     /*val wereRepeated = exitingPhase(currentRun.typerPhase) {
       sym.tpe.params.map(p => isScalaRepeatedParamType(p.tpe))
@@ -4425,7 +4427,7 @@ class JSCodeGen()(using genCtx: Context) {
 
   /** Gen the actual capture values for a JS constructor based on its fake `new` invocation. */
   private def genCaptureValuesFromFakeNewInstance(tree: Tree): List[js.Tree] = {
-    implicit val pos: Position = tree.span
+    //implicit val pos: Position = tree.span
 
     val Apply(fun @ Select(New(_), _), args) = tree: @unchecked
     val sym = fun.symbol
@@ -4475,7 +4477,7 @@ class JSCodeGen()(using genCtx: Context) {
       val f = js.JSSelect(genLoadJSConstructor(companionClass), js.StringLiteral(jsName))
       (f, true)
     } else {
-      val className = encodeClassName(sym.owner)
+      //val className = encodeClassName(sym.owner)
       val fieldIdent = encodeFieldSym(sym)
 
       /* #4370 Fields cannot have type NothingType, so we box them as
@@ -4861,6 +4863,7 @@ object JSCodeGen {
 
   private val selectedValueMethodName = MethodName("selectedValue", Nil, ObjectClassRef)
 
+  @annotation.unused
   private val ObjectArgConstructorName = MethodName.constructor(List(ObjectClassRef))
 
   private val thisOriginalName = OriginalName("this")

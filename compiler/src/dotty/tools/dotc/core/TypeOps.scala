@@ -8,7 +8,7 @@ import util.Spans.*
 import util.Stats
 import Decorators.*
 import StdNames.*
-import collection.mutable
+import collection.mutable.ListBuffer
 import ast.tpd.*
 import reporting.trace
 import config.Printers.typr
@@ -16,10 +16,8 @@ import config.Feature
 import typer.ProtoTypes.*
 import typer.ForceDegree
 import typer.Inferencing.*
-import typer.IfBottom
-import reporting.TestingReporter
 import cc.{CapturingType, derivedCapturingType, CaptureSet, captureSet, isBoxed, isBoxedCapturing}
-import CaptureSet.{CompareResult, IdempotentCaptRefMap, IdentityCaptRefMap}
+import CaptureSet.{IdempotentCaptRefMap, IdentityCaptRefMap}
 
 import scala.annotation.internal.sharable
 import scala.annotation.threadUnsafe
@@ -634,7 +632,7 @@ object TypeOps:
 
     // Skolemized argument types are used to substitute in F-bounds.
     val skolemizedArgTypes = skolemizeWildcardArgs(argTypes, app)
-    val violations = new mutable.ListBuffer[BoundsViolation]
+    val violations = new ListBuffer[BoundsViolation]
 
     def checkOverlapsBounds(lo: Type, hi: Type, arg: Tree, bounds: TypeBounds): Unit = {
       //println(i" = ${instantiate(bounds.hi, argTypes)}")
@@ -834,7 +832,7 @@ object TypeOps:
     /** Gather GADT symbols and singletons found in `tp2`, ie. the scrutinee. */
     object TraverseTp2 extends TypeTraverser:
       val singletons = util.HashMap[Symbol, SingletonType]()
-      val gadtSyms = new mutable.ListBuffer[Symbol]
+      val gadtSyms = new ListBuffer[Symbol]
 
       def traverse(tp: Type) = try
         val tpd = tp.dealias

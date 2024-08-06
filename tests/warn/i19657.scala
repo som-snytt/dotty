@@ -52,3 +52,11 @@ package i17156:
     import b.Xd
     trait Z derives Xd // checks if dealiased import is prefix a.Foo
     class Bar extends Xd[Int] // checks if import qual b is prefix of b.Xd
+
+object Coll:
+  class C:
+    type HM[K, V] = scala.collection.mutable.HashMap[K, V]
+object CC extends Coll.C
+import CC.*
+
+def `param type is imported`(map: HM[String, String]): Unit = println(map("hello, world"))

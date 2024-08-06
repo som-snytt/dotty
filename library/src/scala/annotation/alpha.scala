@@ -7,4 +7,4 @@ package scala.annotation
  *  with symbolic names.
  */
 @deprecated("use @targetName instead")
-final class alpha(externalName: String) extends StaticAnnotation
+final class alpha(@unused externalName: String) extends StaticAnnotation

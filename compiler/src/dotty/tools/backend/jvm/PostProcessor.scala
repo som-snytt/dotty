@@ -2,8 +2,7 @@ package dotty.tools.backend.jvm
 
 import java.util.concurrent.ConcurrentHashMap
 
-import scala.collection.mutable.ListBuffer
-import dotty.tools.dotc.util.{SourcePosition, NoSourcePosition}
+import dotty.tools.dotc.util.SourcePosition
 import dotty.tools.io.AbstractFile
 import dotty.tools.dotc.core.Contexts.*
 import dotty.tools.dotc.core.Decorators.em
@@ -54,7 +53,7 @@ class PostProcessor(val frontendAccess: PostProcessorFrontendAccess, val bTypes:
   def sendToDisk(tasty: GeneratedTasty, sourceFile: AbstractFile): Unit = {
     val GeneratedTasty(classNode, tastyGenerator) = tasty
     val internalName = classNode.name.nn
-    classfileWriter.writeTasty(classNode.name.nn, tastyGenerator(), sourceFile)
+    classfileWriter.writeTasty(internalName, tastyGenerator(), sourceFile)
   }
 
   private def warnCaseInsensitiveOverwrite(clazz: GeneratedClass) = {

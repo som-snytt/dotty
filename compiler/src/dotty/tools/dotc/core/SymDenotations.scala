@@ -2,7 +2,7 @@ package dotty.tools
 package dotc
 package core
 
-import Periods.*, Contexts.*, Symbols.*, Denotations.*, Names.*, NameOps.*, Annotations.*
+import Periods.*, Contexts.*, Symbols.*, Denotations.*, Names.*, Annotations.*
 import Types.*, Flags.*, Decorators.*, DenotTransformers.*, StdNames.*, Scopes.*
 import NameOps.*, NameKinds.*
 import Phases.{Phase, typerPhase, unfusedPhases}
@@ -10,7 +10,6 @@ import Constants.Constant
 import TypeApplications.TypeParamInfo
 import Scopes.Scope
 import dotty.tools.io.AbstractFile
-import Decorators.*
 import ast.*
 import ast.Trees.{LambdaTypeTree, TypeBoundsTree}
 import Trees.Literal

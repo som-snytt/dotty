@@ -4,7 +4,7 @@ package ast
 
 import core.*
 import Types.*, Contexts.*, Flags.*
-import Symbols.*, Annotations.*, Trees.*, Symbols.*, Constants.Constant
+import Annotations.*, Trees.*, Symbols.*, Constants.Constant
 import Decorators.*
 
 
@@ -76,6 +76,7 @@ class TreeTypeMap(
     mapOwnerThis(substMap(typeMap(tp)))
   end mapType
 
+  @annotation.unused
   private def updateDecls(prevStats: List[Tree], newStats: List[Tree]): Unit =
     if (prevStats.isEmpty) assert(newStats.isEmpty)
     else {

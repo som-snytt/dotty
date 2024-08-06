@@ -5,7 +5,7 @@ package core
 import Symbols.*
 import Flags.*
 import Names.*
-import StdNames.*, NameOps.*
+import StdNames.*
 import NullOpsDecorator.*
 import NameKinds.{SkolemName, WildcardParamName}
 import Scopes.*
@@ -39,15 +39,16 @@ import reporting.{trace, Message}
 import java.lang.ref.WeakReference
 import compiletime.uninitialized
 import cc.{CapturingType, CaptureRef, CaptureSet, SingletonCaptureRef, isTrackableRef,
-           derivedCapturingType, isBoxedCapturing, isCaptureChecking, isRetains, isRetainsLike}
-import CaptureSet.{CompareResult, IdempotentCaptRefMap, IdentityCaptRefMap}
+           derivedCapturingType, isRetains, isRetainsLike}
+import CaptureSet.{IdempotentCaptRefMap, IdentityCaptRefMap}
 
 import scala.annotation.internal.sharable
-import scala.annotation.threadUnsafe
+import scala.annotation.{threadUnsafe, unused}
 import dotty.tools.dotc.cc.ccConfig
 
 object Types extends TypeUtils {
 
+  @unused // debug only
   @sharable private var nextId = 0
 
   implicit def eqType: CanEqual[Type, Type] = CanEqual.derived
@@ -3212,7 +3213,7 @@ object Types extends TypeUtils {
 
     override def underlying(using Context): Type = parent
 
-    private def badInst =
+    @unused private def badInst =
       throw new AssertionError(s"bad instantiation: $this")
 
     def checkInst(using Context): this.type = this // debug hook
@@ -5273,7 +5274,7 @@ object Types extends TypeUtils {
      *  Returns a MatchTypeCaseError if the pattern in `caseLambda` is a not a legal pattern.
      */
     private def tryConvertToSpecPattern(caseLambda: HKTypeLambda, pat: Type)(using Context): MatchTypeCaseResult =
-      var typeParamRefsUnaccountedFor = (0 until caseLambda.paramNames.length).to(mutable.BitSet)
+      val typeParamRefsUnaccountedFor = (0 until caseLambda.paramNames.length).to(mutable.BitSet)
 
       def rec(pat: Type, variance: Int): MatchTypeCaseResult =
         pat match

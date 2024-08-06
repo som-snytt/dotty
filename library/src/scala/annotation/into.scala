@@ -1,5 +1,4 @@
 package scala.annotation
-import annotation.experimental
 
 /** An annotation on (part of) a parameter type that allows implicit conversions
  *  for its arguments. The `into` modifier on parameter types in Scala 3 is
@@ -7,4 +6,4 @@ import annotation.experimental
  *  Scala 2 sources only. For Scala 3, the `into` modifier should be preferred.
  */
 @experimental
-class into() extends annotation.StaticAnnotation
+class into() extends StaticAnnotation

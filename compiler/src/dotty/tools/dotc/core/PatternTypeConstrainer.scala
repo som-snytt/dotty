@@ -10,6 +10,7 @@ import Contexts.ctx
 import dotty.tools.dotc.reporting.trace
 import config.Feature.migrateTo3
 import config.Printers.*
+import scala.annotation.unused
 
 trait PatternTypeConstrainer { self: TypeComparer =>
 
@@ -234,7 +235,7 @@ trait PatternTypeConstrainer { self: TypeComparer =>
       case _ => false
     }
 
-    def widenVariantParams(tp: Type) = tp match {
+    @unused def widenVariantParams(tp: Type) = tp match {
       case tp @ AppliedType(tycon, args) =>
         val args1 = args.zipWithConserve(tycon.typeParams)((arg, tparam) =>
           if (tparam.paramVarianceSign != 0) TypeBounds.empty else arg

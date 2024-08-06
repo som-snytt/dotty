@@ -6,10 +6,9 @@ import core.*
 import util.Spans.*, Types.*, Contexts.*, Constants.*, Names.*, NameOps.*, Flags.*
 import Symbols.*, StdNames.*, Trees.*, ContextOps.*
 import Decorators.*
-import Annotations.Annotation
 import NameKinds.{UniqueName, ContextBoundParamName, ContextFunctionParamName, DefaultGetterName, WildcardParamName}
 import typer.{Namer, Checking}
-import util.{Property, SourceFile, SourcePosition, SrcPos, Chars}
+import util.{Property, SourceFile, SourcePosition, Chars}
 import config.{Feature, Config}
 import config.SourceVersion.*
 import collection.mutable
@@ -20,7 +19,6 @@ import config.Printers
 import parsing.Parsers
 
 import scala.annotation.internal.sharable
-import scala.annotation.threadUnsafe
 
 object desugar {
   import untpd.*
@@ -121,7 +119,7 @@ object desugar {
         def apply(tp: Type) = tp match {
           case tp: NamedType if tp.symbol.exists && (tp.symbol.owner eq originalOwner) =>
             val defctx = mapCtx.outersIterator.dropWhile(_.scope eq mapCtx.scope).next()
-            var local = defctx.denotNamed(tp.name).suchThat(_.isParamOrAccessor).symbol
+            val local = defctx.denotNamed(tp.name).suchThat(_.isParamOrAccessor).symbol
             if (local.exists) (defctx.owner.thisType select local).dealiasKeepAnnots
             else {
               def msg =
@@ -181,7 +179,7 @@ object desugar {
   def valDef(vdef0: ValDef)(using Context): Tree =
     val vdef @ ValDef(_, tpt, rhs) = vdef0
     val valName = normalizeName(vdef, tpt).asTermName
-    var mods1 = vdef.mods
+    val mods1 = vdef.mods
 
     val vdef1 = cpy.ValDef(vdef)(name = valName).withMods(mods1)
 
@@ -703,6 +701,7 @@ object desugar {
       (if (args.isEmpty) tycon else AppliedTypeTree(tycon, args))
         .withSpan(cdef.span.startPos)
 
+    @annotation.unused
     def isHK(tparam: Tree): Boolean = tparam match {
       case TypeDef(_, LambdaTypeTree(tparams, body)) => true
       case TypeDef(_, rhs: DerivedTypeTree) => isHK(rhs.watched)
@@ -1469,7 +1468,7 @@ object desugar {
     case tree: MemberDef =>
       var tested: MemberDef = tree
       def checkApplicable(flag: Flag, test: MemberDefTest): MemberDef =
-        if (tested.mods.is(flag) && !test.applyOrElse(tree, (md: MemberDef) => false)) {
+        if (tested.mods.is(flag) && !test.applyOrElse(tree, (_: MemberDef) => false)) {
           report.error(ModifierNotAllowedForDefinition(flag), tree.srcPos)
            tested.withMods(tested.mods.withoutFlags(flag))
         } else tested
@@ -1804,6 +1803,7 @@ object desugar {
     mayNeedSetter
   }
 
+  @annotation.unused
   private def derivedDefDef(original: Tree, named: NameTree, tpt: Tree, rhs: Tree, mods: Modifiers)(implicit src: SourceFile) =
     DefDef(named.name.asTermName, Nil, tpt, rhs)
       .withMods(mods)
