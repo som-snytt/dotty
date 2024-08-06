@@ -14,7 +14,7 @@ import dotty.tools.dotc.core.Phases.Phase
 import dotty.tools.dotc.core.StdNames.nme
 import dotty.tools.dotc.core.Types.{AnnotatedType, ClassInfo, ConstantType, NamedType, NoType, TermRef, Type, TypeProxy, TypeTraverser}
 import dotty.tools.dotc.core.Flags
-import dotty.tools.dotc.core.Names.Name
+import dotty.tools.dotc.core.Names.{Name, TermName, termName}
 import dotty.tools.dotc.core.NameOps.isReplWrapperName
 import dotty.tools.dotc.core.NameKinds.WildcardParamName
 import dotty.tools.dotc.core.Symbols.{NoSymbol, Symbol, defn, isDeprecated}
@@ -673,6 +673,7 @@ object CheckUnused:
 
       private def shouldReportPrivateDef(using Context): Boolean =
         peekScopeType == ScopeType.Template && !memDef.symbol.isConstructor && memDef.symbol.is(Private, butNot = SelfName | Synthetic | CaseAccessor)
+        && !ignoredNames(memDef.symbol.name.toTermName)
 
       private def isUnsetVarDef(using Context): Boolean =
         val sym = memDef.symbol
@@ -730,7 +731,12 @@ object CheckUnused:
      *  the prefix from which it was selected, and whether it is in a derived element.
      */
     class Usage(val symbol: Symbol, val name: Option[Name], val prefix: Type)
+
+    val ignoredNames: Set[TermName] = Set(
+      "readResolve", "readObject", "writeObject", "writeReplace"
+    ).map(termName(_))
   end UnusedData
+
   extension (sym: Symbol)
     /** is accessible without import in current context */
     def isAccessibleAsIdent(using Context): Boolean =
