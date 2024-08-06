@@ -250,7 +250,10 @@ object Build {
       "-deprecation",
       "-unchecked",
       //"-Wconf:cat=deprecation&msg=Unsafe:s",    // example usage
-      "-Xfatal-warnings",                         // -Werror in modern usage
+      //"-Xfatal-warnings",                         // -Werror in modern usage
+      "-Wconf:msg=unused private member&src=LazyVals.scala:s",
+      "-Werror",
+      "-Wunused:all",
       "-encoding", "UTF8",
       "-language:implicitConversions",
     ),
