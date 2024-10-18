@@ -1,3 +1,4 @@
+package p;
 
 public class java {
 	public static class lang {
