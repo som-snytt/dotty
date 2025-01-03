@@ -13,10 +13,12 @@ import dotty.tools.dotc.core.StdNames.nme
 import dotty.tools.dotc.core.Symbols.{ClassSymbol, NoSymbol, Symbol, defn, isDeprecated, requiredClass, requiredModule}
 import dotty.tools.dotc.core.Types.*
 import dotty.tools.dotc.report
-import dotty.tools.dotc.reporting.UnusedSymbol
+import dotty.tools.dotc.reporting.{CodeAction, UnusedSymbol}
+import dotty.tools.dotc.rewrites.Rewrites
 import dotty.tools.dotc.transform.MegaPhase.MiniPhase
 import dotty.tools.dotc.typer.ImportInfo
-import dotty.tools.dotc.util.{Property, SrcPos}
+import dotty.tools.dotc.util.{Property, Spans, SrcPos}, Spans.Span
+import dotty.tools.dotc.util.Chars.{isLineBreakChar, isWhitespace}
 import dotty.tools.dotc.util.chaining.*
 
 import java.util.IdentityHashMap
@@ -411,7 +413,6 @@ object CheckUnused:
       case imp: Import =>
         if languageImport(imp.expr).isEmpty
           && !imp.isGeneratedByEnum
-          //&& !imp.isTransparentInline
         then
           imps.put(imp, ())
       case tree: Bind =>
@@ -436,18 +437,26 @@ object CheckUnused:
     def saw(sym: Symbol, name: Name, pre: Type)(using Context): Boolean =
       seen(sym).exists((n, p) => n == name && p =:= pre)
 
-  def reportUnused()(using Context): Unit = warnings.foreach(report.warning(_, _))
+  def reportUnused()(using Context): Unit =
+    for (msg, pos, origin) <- warnings do
+      if origin.isEmpty then report.warning(msg, pos)
+      else report.warning(msg, pos, origin)
+      msg.actions.headOption.foreach(Rewrites.applyAction)
 
-  def warnings(using Context): Array[(UnusedSymbol, SrcPos)] =
-    val warnings = ArrayBuilder.make[(UnusedSymbol, SrcPos)]
+  type MessageInfo = (UnusedSymbol, SrcPos, String) // string is origin or empty
+
+  def warnings(using Context): Array[MessageInfo] =
+    val actionable = ctx.settings.rewrite.value.nonEmpty
+    val warnings = ArrayBuilder.make[MessageInfo]
+    def warnAt(pos: SrcPos)(msg: UnusedSymbol, origin: String = ""): Unit = warnings.addOne((msg, pos, origin))
     val infos = refInfos
     for (sym, pos) <- infos.defs.iterator if !sym.hasAnnotation(defn.UnusedAnnot) do
       if infos.refs(sym) then
         if sym.isLocalToBlock then
           if ctx.settings.WunusedHas.locals && sym.is(Mutable) && !infos.asss(sym) then
-            warnings.addOne((UnusedSymbol.unsetLocals, pos))
+            warnAt(pos)(UnusedSymbol.unsetLocals)
         else if sym.isAllOf(Private | Mutable) && !infos.asss(sym) then
-          warnings.addOne((UnusedSymbol.unsetPrivates, pos))
+          warnAt(pos)(UnusedSymbol.unsetPrivates)
       else if sym.is(Private, butNot = ParamAccessor) then
         if ctx.settings.WunusedHas.privates
           && !sym.isConstructor
@@ -455,7 +464,7 @@ object CheckUnused:
           && !sym.isSerializationSupport
           && !(sym.is(Mutable) && sym.isSetter && sym.owner.is(Trait)) // tracks sym.underlyingSymbol sibling getter
         then
-          warnings.addOne((UnusedSymbol.privateMembers, pos))
+          warnAt(pos)(UnusedSymbol.privateMembers)
       else if sym.is(Param, butNot = Given | Implicit) then
         val m = sym.owner
         def forgiven(sym: Symbol) =
@@ -476,10 +485,10 @@ object CheckUnused:
               if aliasSym.isAllOf(PrivateParamAccessor, butNot = CaseAccessor) && !infos.refs(alias.symbol) then
                 if aliasSym.is(Local) then
                   if ctx.settings.WunusedHas.explicits then
-                    warnings.addOne((UnusedSymbol.explicitParams, pos))
+                    warnAt(pos)(UnusedSymbol.explicitParams)
                 else
                   if ctx.settings.WunusedHas.privates then
-                    warnings.addOne((UnusedSymbol.privateMembers, pos))
+                    warnAt(pos)(UnusedSymbol.privateMembers)
           else if ctx.settings.WunusedHas.explicits
             && !sym.is(Synthetic) // param to setter is unused bc there is no field yet
             && !(sym.owner.is(ExtensionMethod) && {
@@ -490,7 +499,7 @@ object CheckUnused:
             && !sym.name.isInstanceOf[DerivedName]
             && !ctx.platform.isMainMethod(m)
           then
-            warnings.addOne((UnusedSymbol.explicitParams, pos))
+            warnAt(pos)(UnusedSymbol.explicitParams)
         end checkExplicit
         if !infos.skip(m)
           && !forgiven(sym)
@@ -519,14 +528,14 @@ object CheckUnused:
             if alias.exists then
               val aliasSym = alias.symbol
               if aliasSym.is(ParamAccessor) && !infos.refs(alias.symbol) then
-                warnings.addOne((UnusedSymbol.implicitParams, pos))
+                warnAt(pos)(UnusedSymbol.implicitParams)
           else
-            warnings.addOne((UnusedSymbol.implicitParams, pos))
+            warnAt(pos)(UnusedSymbol.implicitParams)
       else if sym.isLocalToBlock then
         if ctx.settings.WunusedHas.locals
           && !sym.isCanEqual
         then
-          warnings.addOne((UnusedSymbol.localDefs, pos))
+          warnAt(pos)(UnusedSymbol.localDefs)
 
     if ctx.settings.WunusedHas.patvars then
       // convert the one non-synthetic so all are comparable
@@ -536,18 +545,134 @@ object CheckUnused:
       val byPos = infos.pats.groupMap(uniformPos(_, _))((sym, pos) => sym)
       for (pos, syms) <- byPos if !syms.exists(_.hasAnnotation(defn.UnusedAnnot)) do
         if !syms.exists(infos.refs(_)) && !syms.exists(v => !v.isLocal && !v.is(Private)) then
-          warnings.addOne((UnusedSymbol.patVars, pos))
+          warnAt(pos)(UnusedSymbol.patVars)
 
+    // TODO check for unused masking import
     import scala.jdk.CollectionConverters.given
-    val actionable = false && ctx.settings.rewrite.value.nonEmpty
+    import Rewrites.ActionPatch
     if (ctx.settings.WunusedHas.imports || ctx.settings.WunusedHas.strictNoImplicitWarn) && !infos.isRepl then
-      for imp <- infos.imps.keySet.nn.asScala do
-        if actionable then
-          ???
-        else
-          for sel <- imp.selectors do
-            if !sel.isImportExclusion && !infos.sels.containsKey(sel) && !imp.isLoose(sel) then
-              warnings.addOne((UnusedSymbol.imports(actions = Nil), sel.srcPos))
+      type ImpSel = (Import, ImportSelector)
+      def isUsable(imp: Import, sel: ImportSelector): Boolean =
+        sel.isImportExclusion || infos.sels.containsKey(sel) || imp.isLoose(sel)
+      def warnImport(warnable: ImpSel, actions: List[CodeAction] = Nil): Unit =
+        val (imp, sel) = warnable
+        val msg = UnusedSymbol.imports(actions)
+        // example collection.mutable.{Map as MutMap}
+        val origin = cpy.Import(imp)(imp.expr, List(sel)).show(using ctx.withoutColors).stripPrefix("import ")
+        warnAt(sel.srcPos)(msg, origin)
+
+      if !actionable then
+        for imp <- infos.imps.keySet.nn.asScala; sel <- imp.selectors if !isUsable(imp, sel) do
+          warnImport(imp -> sel)
+      else
+        // If the rest of the line is blank, include it in the final edit position. (Delete trailing whitespace.)
+        // If for deletion, and the prefix of the line is also blank, then include that, too. (Del blank line.)
+        def editPosAt(srcPos: SrcPos, forDeletion: Boolean): SrcPos =
+          val start = srcPos.span.start
+          val end = srcPos.span.end
+          val content = srcPos.sourcePos.source.content()
+          val prev = content.lastIndexWhere(c => !isWhitespace(c), end = start - 1)
+          val emptyLeft = prev < 0 || isLineBreakChar(content(prev))
+          val next = content.indexWhere(c => !isWhitespace(c), from = end)
+          val emptyRight = next < 0 || isLineBreakChar(content(next))
+          val deleteLine = emptyLeft && emptyRight && forDeletion
+          val bump = if (deleteLine) 1 else 0 // todo improve to include offset of next line, endline + 1
+          val p0 = srcPos.span
+          val p1 = if (next >= 0 && emptyRight) p0.withEnd(next + bump) else p0
+          val p2 = if (deleteLine) p1.withStart(prev + 1) else p1
+          srcPos.sourcePos.withSpan(p2)
+        def actionsOf(actions: (SrcPos, String)*): List[CodeAction] =
+          val patches = actions.map((srcPos, replacement) => ActionPatch(srcPos.sourcePos, replacement)).toList
+          List(CodeAction(title = "unused import", description = Some("remove import"), patches))
+        def replace(editPos: SrcPos)(replacement: String): List[CodeAction] = actionsOf(editPos -> replacement)
+        def deletion(editPos: SrcPos): List[CodeAction] = actionsOf(editPos -> "")
+        def textFor(impsel: ImpSel): String =
+          val (imp, sel) = impsel
+          val content = imp.srcPos.sourcePos.source.content()
+          def textAt(pos: SrcPos) = String(content.slice(pos.span.start, pos.span.end))
+          val qual = textAt(imp.expr.srcPos) // keep original
+          val selector = textAt(sel.srcPos)  // keep original
+          s"$qual.$selector"                 // don't succumb to vagaries of show
+        // begin actionable
+        val sortedImps = infos.imps.keySet.nn.asScala.toArray.sorta(_.srcPos.span.point) // sorted by pos
+        var index = 0
+        while index < sortedImps.length do
+          val nextImport = sortedImps.indexSatisfying(from = index + 1)(_.isPrimaryClause) // next import statement
+          if sortedImps.indexSatisfying(from = index, until = nextImport): imp =>
+              imp.selectors.exists(!isUsable(imp, _)) // check if any selector in statement was unused
+          < nextImport then
+            // if no usable selectors in the import statement, delete it entirely.
+            // if there is exactly one usable selector, then replace with just that selector (i.e., format it).
+            // else for each clause, delete it or format one selector or delete unused selectors.
+            // To delete a comma separated item, delete start-to-start, but for last item delete a preceding comma.
+            // Reminder that first clause span includes the keyword, so delete point-to-start instead.
+            val existing = sortedImps.slice(index, nextImport)
+            val (keeping, deleting) = existing.iterator.flatMap(imp => imp.selectors.map(imp -> _)).toList
+                                      .partition(isUsable(_, _))
+            if keeping.isEmpty then
+              val editPos = existing.head.srcPos.sourcePos.withSpan:
+                Span(start = existing.head.srcPos.span.start, end = existing.last.srcPos.span.end)
+              deleting.init.foreach(warnImport(_))
+              warnImport(deleting.last, deletion(editPosAt(editPos, forDeletion = true)))
+            else if keeping.lengthIs == 1 then
+              val editPos = existing.head.srcPos.sourcePos.withSpan:
+                Span(start = existing.head.srcPos.span.start, end = existing.last.srcPos.span.end)
+              deleting.init.foreach(warnImport(_))
+              val text = s"import ${textFor(keeping.head)}"
+              warnImport(deleting.last, replace(editPosAt(editPos, forDeletion = false))(text))
+            else
+              val lostClauses = existing.iterator.filter(imp => !keeping.exists((i, _) => imp eq i)).toList
+              for imp <- lostClauses do
+                val actions =
+                  if imp == existing.last then
+                    val content = imp.srcPos.sourcePos.source.content()
+                    val prev = existing.lastIndexWhere(i0 => keeping.exists((i, _) => i == i0))
+                    val comma = content.indexOf(',', from = existing(prev).srcPos.span.end)
+                    val commaPos = imp.srcPos.sourcePos.withSpan:
+                      Span(start = comma, end = existing(prev + 1).srcPos.span.start)
+                    val srcPos = imp.srcPos
+                    val editPos = srcPos.sourcePos.withSpan: // exclude keyword
+                      srcPos.span.withStart(srcPos.span.point)
+                    actionsOf(commaPos -> "", editPos -> "")
+                  else
+                    val impIndex = existing.indexOf(imp)
+                    val editPos = imp.srcPos.sourcePos.withSpan: // exclude keyword
+                      Span(start = imp.srcPos.span.point, end = existing(impIndex + 1).srcPos.span.start)
+                    deletion(editPos)
+                imp.selectors.init.foreach(sel => warnImport(imp -> sel))
+                warnImport(imp -> imp.selectors.last, actions)
+              val singletons = existing.iterator.filter(imp => keeping.count((i, _) => imp eq i) == 1).toList
+              var seen = List.empty[Import]
+              for impsel <- deleting do
+                val (imp, sel) = impsel
+                if singletons.contains(imp) then
+                  if seen.contains(imp) then
+                    warnImport(impsel)
+                  else
+                    seen ::= imp
+                    val editPos = imp.srcPos.sourcePos.withSpan:
+                      Span(start = imp.srcPos.span.point, end = imp.srcPos.span.end) // exclude keyword
+                    val text = textFor(keeping.find((i, _) => imp eq i).get)
+                    warnImport(impsel, replace(editPosAt(editPos, forDeletion = false))(text))
+                else if !lostClauses.contains(imp) then
+                  val actions =
+                    if sel == imp.selectors.last then
+                      val content = sel.srcPos.sourcePos.source.content()
+                      val prev = imp.selectors.lastIndexWhere(s0 => keeping.exists((_, s) => s == s0))
+                      val comma = content.indexOf(',', from = imp.selectors(prev).srcPos.span.end)
+                      val commaPos = sel.srcPos.sourcePos.withSpan:
+                        Span(start = comma, end = imp.selectors(prev + 1).srcPos.span.start)
+                      val editPos = sel.srcPos
+                      actionsOf(commaPos -> "", editPos -> "")
+                    else
+                      val selIndex = imp.selectors.indexOf(sel)
+                      val editPos = sel.srcPos.sourcePos.withSpan:
+                        sel.srcPos.span.withEnd(imp.selectors(selIndex + 1).srcPos.span.start)
+                      deletion(editPos)
+                  warnImport(impsel, actions)
+          end if
+          index = nextImport
+        end while
 
     warnings.result().sorta(_._2.span.point)
   end warnings
@@ -649,17 +774,14 @@ object CheckUnused:
       case _ => false
 
   extension (imp: Import)
+    /** Is it the first import clause in a statement? `a.x` in `import a.x, b,{y, z}` */
+    def isPrimaryClause(using Context): Boolean =
+      val span = imp.srcPos.span
+      span.start != span.point // primary clause starts at `import` keyword
+
     /** Generated import of cases from enum companion. */
     def isGeneratedByEnum(using Context): Boolean =
       imp.symbol.exists && imp.symbol.owner.is(Enum, butNot = Case)
-
-    /** Checks if import selects a def that is transparent and inline.
-    def isTransparentInline(using Context): Boolean =
-      val qual = imp.expr
-      imp.selectors.exists: sel =>
-        val importedMembers = qual.tpe.member(sel.name).alternatives
-        importedMembers.exists(_.symbol.isAllOf(Transparent | Inline))
-     */
 
     /** Under -Wunused:strict-no-implicit-warn, avoid false positives
      *  if this selector is a wildcard that might import implicits or
@@ -685,4 +807,10 @@ object CheckUnused:
       }
       Arrays.sort(arr.asInstanceOf[Array[A | Null]], cmp)
       arr
+    // returns `until` if not satisfied
+    def indexSatisfying(from: Int, until: Int = arr.length)(p: A => Boolean): Int =
+      var i = from
+      while i < until && !p(arr(i)) do
+        i += 1
+      i
 end CheckUnused

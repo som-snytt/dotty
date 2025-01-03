@@ -1,5 +1,4 @@
-//> using options  -Wunused:imports
-
+//> using options -Wunused:imports -Wconf:origin=Suppressed.*:s
 
 object FooUnused:
   import collection.mutable.Set // warn
@@ -316,3 +315,9 @@ object `more nestings`:
         thing
       def k() =
         Inner.thing
+
+object Suppressed:
+  val suppressed = 42
+object Suppressing:
+  import Suppressed.* // no warn, see options
+  def f = 42
