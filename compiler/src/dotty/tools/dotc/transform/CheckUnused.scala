@@ -533,6 +533,7 @@ object CheckUnused:
             warnAt(pos)(UnusedSymbol.implicitParams)
       else if sym.isLocalToBlock then
         if ctx.settings.WunusedHas.locals
+          && !sym.is(InlineProxy)
           && !sym.isCanEqual
         then
           warnAt(pos)(UnusedSymbol.localDefs)
