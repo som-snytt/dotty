@@ -16,7 +16,7 @@ import dotty.tools.dotc.report
 import dotty.tools.dotc.reporting.{CodeAction, UnusedSymbol}
 import dotty.tools.dotc.rewrites.Rewrites
 import dotty.tools.dotc.transform.MegaPhase.MiniPhase
-import dotty.tools.dotc.typer.ImportInfo
+import dotty.tools.dotc.typer.{ImportInfo, Typer}
 import dotty.tools.dotc.util.{Property, Spans, SrcPos}, Spans.Span
 import dotty.tools.dotc.util.Chars.{isLineBreakChar, isWhitespace}
 import dotty.tools.dotc.util.chaining.*
@@ -40,9 +40,8 @@ class CheckUnused private (phaseMode: PhaseMode, suffix: String) extends MiniPha
   override def isRunnable(using Context): Boolean = super.isRunnable && ctx.settings.WunusedHas.any && !ctx.isJava
 
   override def prepareForUnit(tree: Tree)(using Context): Context =
-    val infos = tree.getAttachment(refInfosKey).getOrElse {
+    val infos = tree.getAttachment(refInfosKey).getOrElse:
       RefInfos().tap(tree.withAttachment(refInfosKey, _))
-    }
     ctx.fresh.setProperty(refInfosKey, infos)
   override def transformUnit(tree: Tree)(using Context): tree.type =
     if phaseMode == PhaseMode.Report then
@@ -66,6 +65,10 @@ class CheckUnused private (phaseMode: PhaseMode, suffix: String) extends MiniPha
         resolveUsage(tree.symbol, name, tree.qualifier.tpe)
     else
       refUsage(tree.symbol)
+    tree
+
+  override def transformLiteral(tree: Literal)(using Context): tree.type =
+    tree.getAttachment(Typer.AdaptedTree).foreach(transformAllDeep)
     tree
 
   override def prepareForCaseDef(tree: CaseDef)(using Context): Context =
