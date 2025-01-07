@@ -1228,7 +1228,7 @@ object Build {
       Compile / doc / scalacOptions += "-Ydocument-synthetic-types",
       scalacOptions += "-Ycompile-scala2-library",
       scalacOptions += "-Yscala2-unpickler:never",
-      scalacOptions -= "-Werror",
+      scalacOptions += "-Werror:false",
       Compile / compile / logLevel.withRank(KeyRanks.Invisible) := Level.Error,
       ivyConfigurations += SourceDeps.hide,
       transitiveClassifiers := Seq("sources"),
