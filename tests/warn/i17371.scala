@@ -26,3 +26,14 @@ def f[K, T](start: T, end: T)(using circular: Circular[K], turns: Turns[K, T]): 
 
   import circular.given
   start.extract < end.extract
+
+// -Wunused:implicits warns for unused implicit evidence unless it is an empty interface (only universal members).
+// scala 2 also offers -Wunused:synthetics for whether to warn for synthetic implicit params.
+object ContextBounds:
+  class C[A: Ordered](a: A): // warn
+    def f = a
+
+  trait T[A]
+
+  class D[A: T](a: A): // no warn
+    def f = a

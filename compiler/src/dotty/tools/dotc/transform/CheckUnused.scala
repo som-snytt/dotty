@@ -516,7 +516,7 @@ object CheckUnused:
              m.isDeprecated
           || m.is(Synthetic)
           || sym.name.is(ContextFunctionParamName)    // a ubiquitous parameter
-          || sym.name.is(ContextBoundParamName)       // a ubiquitous parameter
+          || sym.name.is(ContextBoundParamName) && sym.info.typeSymbol.isMarkerTrait // a ubiquitous parameter
           || m.hasAnnotation(dd.UnusedAnnot)          // param of unused method
           || sym.info.typeSymbol.match                // more ubiquity
              case dd.DummyImplicitClass | dd.SubTypeClass | dd.SameTypeClass => true
@@ -768,6 +768,10 @@ object CheckUnused:
         && sym.owner.derivesFrom(defn.JavaSerializableClass)
     def isCanEqual(using Context): Boolean =
       sym.isOneOf(GivenOrImplicit) && sym.info.finalResultType.baseClasses.exists(_.derivesFrom(defn.CanEqualClass))
+    def isMarkerTrait(using Context): Boolean =
+      sym.isClass && sym.info.allMembers.forall: d =>
+        val m = d.symbol
+        !m.isTerm || m.isSelfSym || m.is(Method) && (m.owner == defn.AnyClass || m.owner == defn.ObjectClass)
 
   extension (sel: ImportSelector)
     def boundTpe: Type = sel.bound match
