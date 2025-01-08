@@ -63,6 +63,7 @@ def `param type is imported`(map: HM[String, String]): Unit = println(map("hello
 
 object Constants:
   final val i = 42
+  def extra = 3
 def `old-style constants are usages`: Unit =
   object Local:
     final val j = 27
@@ -76,13 +77,14 @@ class `scope of super`:
   class C(x: Int):
     def y = x
   class D(j: Int) extends C(i + j):
-    import Constants.* // does not resolve i in C(i)
-    def m = i
+    import Constants.* // does not resolve i in C(i) and does not shadow named import
+    def m = i // actually picks the higher-precedence import
     def f =
       import Constantinople.*
       class E(e: Int) extends C(i + k):
         def g = e + y + k + 1
       E(0).g
+    def consume = extra // use the wildcard import from Constants
 
 import scala.annotation.meta.*
 object Alias {

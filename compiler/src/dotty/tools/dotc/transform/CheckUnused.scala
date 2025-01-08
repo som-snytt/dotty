@@ -470,12 +470,13 @@ object CheckUnused:
           warnAt(pos)(UnusedSymbol.privateMembers)
       else if sym.is(Param, butNot = Given | Implicit) then
         val m = sym.owner
-        def forgiven(sym: Symbol) =
+        def forgiven =
           val dd = defn
-             sym.owner.isDeprecated
-          || sym.owner.hasAnnotation(defn.UnusedAnnot) // param of unused method
+             m.isDeprecated
+          || m.is(Synthetic)
+          || m.hasAnnotation(defn.UnusedAnnot) // param of unused method
           || sym.info.isSingleton
-          || sym.owner.isConstructor && sym.owner.owner.thisType.baseClasses.contains(defn.AnnotationClass)
+          || m.isConstructor && m.owner.thisType.baseClasses.contains(defn.AnnotationClass)
         def checkExplicit(): Unit =
           // A class param is unused if its param accessor is unused.
           // (The class param is not assigned to a field until constructors.)
@@ -505,14 +506,16 @@ object CheckUnused:
             warnAt(pos)(UnusedSymbol.explicitParams)
         end checkExplicit
         if !infos.skip(m)
-          && !forgiven(sym)
+          && !forgiven
         then
           checkExplicit()
       else if sym.is(Param) then // Given | Implicit
         val m = sym.owner
-        def forgiven(sym: Symbol) =
+        def forgiven =
           val dd = defn
-             sym.name.is(ContextFunctionParamName)    // a ubiquitous parameter
+             m.isDeprecated
+          || m.is(Synthetic)
+          || sym.name.is(ContextFunctionParamName)    // a ubiquitous parameter
           || sym.name.is(ContextBoundParamName)       // a ubiquitous parameter
           || m.hasAnnotation(dd.UnusedAnnot)          // param of unused method
           || sym.info.typeSymbol.match                // more ubiquity
@@ -524,7 +527,7 @@ object CheckUnused:
           || sym.info.isInstanceOf[RefinedType] // can't be expressed as a context bound
         if ctx.settings.WunusedHas.implicits
           && !infos.skip(m)
-          && !forgiven(sym)
+          && !forgiven
         then
           if m.isPrimaryConstructor then
             val alias = m.owner.info.member(sym.name)
