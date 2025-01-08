@@ -473,7 +473,7 @@ object CheckUnused:
         def forgiven =
           val dd = defn
              m.isDeprecated
-          || m.is(Synthetic)
+          || m.is(Synthetic) && !m.isAnonymousFunction
           || m.hasAnnotation(defn.UnusedAnnot) // param of unused method
           || sym.info.isSingleton
           || m.isConstructor && m.owner.thisType.baseClasses.contains(defn.AnnotationClass)

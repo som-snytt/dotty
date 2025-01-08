@@ -24,13 +24,13 @@ class B3(msg0: String) extends A("msg") // warn /Dotty: unused explicit paramete
 trait Bing
 
 trait Accessors {
-  private var v1: Int = 0 // warn warn
-  private var v2: Int = 0 // warn warn, never set
-  private var v3: Int = 0
+  private var v1: Int = 0 // warn
+  private var v2: Int = 0 // warn, never set
+  private var v3: Int = 0 // warn, never got
   private var v4: Int = 0 // no warn
 
-  private[this] var v5 = 0 // warn warn, never set
-  private[this] var v6 = 0
+  private[this] var v5 = 0 // warn, never set
+  private[this] var v6 = 0 // warn, never got
   private[this] var v7 = 0 // no warn
 
   def bippy(): Int = {
@@ -43,13 +43,13 @@ trait Accessors {
 }
 
 class StableAccessors {
-  private var s1: Int = 0 // warn warn
-  private var s2: Int = 0 // warn warn, never set
-  private var s3: Int = 0
+  private var s1: Int = 0 // warn
+  private var s2: Int = 0 // warn, never set
+  private var s3: Int = 0 // warn, never got
   private var s4: Int = 0 // no warn
 
-  private[this] var s5 = 0 // warn warn, never set
-  private[this] var s6 = 0 // no warn, limitation /Dotty: Why limitation ?
+  private[this] var s5 = 0 // warn, never set
+  private[this] var s6 = 0 // warn, never got
   private[this] var s7 = 0 // no warn
 
   def bippy(): Int = {
@@ -62,7 +62,7 @@ class StableAccessors {
 }
 
 trait DefaultArgs {
-  private def bippy(x1: Int, x2: Int = 10, x3: Int = 15): Int = x1 + x2 + x3 // no more warn warn since #17061
+  private def bippy(x1: Int, x2: Int = 10, x3: Int = 15): Int = x1 + x2 + x3 // warn // warn
 
   def boppy() = bippy(5, 100, 200)
 }
@@ -124,9 +124,9 @@ trait Underwarn {
 }
 
 class OtherNames {
-  private def x_=(i: Int): Unit = () // no more warn since #17061
-  private def x: Int = 42 // warn Dotty triggers unused private member : To investigate
-  private def y_=(i: Int): Unit = () // // no more warn since #17061
+  private def x_=(i: Int): Unit = () // warn
+  private def x: Int = 42 // warn
+  private def y_=(i: Int): Unit = () // warn
   private def y: Int = 42
 
   def f = y
@@ -145,7 +145,7 @@ trait Forever {
     val t = Option((17, 42))
     for {
       ns <- t
-      (i, j) = ns                        // no warn
+      (i, j) = ns                        // warn // warn -Wunused:patvars is in -Wunused:all
     } yield 42                           // val emitted only if needed, hence nothing unused
   }
 }
@@ -158,14 +158,14 @@ trait CaseyKasem {
   def f = 42 match {
     case x if x < 25 => "no warn"
     case y if toString.nonEmpty => "no warn" + y
-    case z => "warn"
+    case z => "warn" // warn patvar
   }
 }
 trait CaseyAtTheBat {
   def f = Option(42) match {
     case Some(x) if x < 25 => "no warn"
-    case Some(y @ _) if toString.nonEmpty => "no warn"
-    case Some(z) => "warn"
+    case Some(y @ _) if toString.nonEmpty => "no warn" // warn todo whether to use name @ _ to suppress
+    case Some(z) => "warn" // warn patvar
     case None => "no warn"
   }
 }
@@ -173,7 +173,7 @@ trait CaseyAtTheBat {
 class `not even using companion privates`
 
 object `not even using companion privates` {
-  private implicit class `for your eyes only`(i: Int) {  // no more warn since #17061
+  private implicit class `for your eyes only`(i: Int) {  // warn
     def f = i
   }
 }

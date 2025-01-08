@@ -209,7 +209,7 @@ trait CaseyAtTheBat {
 class `not even using companion privates`
 
 object `not even using companion privates` {
-  private implicit class `for your eyes only`(i: Int) {  // warn no warn deprecated feature TODO
+  private implicit class `for your eyes only`(i: Int) {  // warn
     def f = i
   }
 }
