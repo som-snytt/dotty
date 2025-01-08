@@ -357,7 +357,7 @@ class CheckUnused private (phaseMode: PhaseMode, suffix: String) extends MiniPha
     end while
     if !foundEnclosing then
       refInfos.refs.addOne(sym)
-      if phaseMode.eq(PhaseMode.Aggregate) && candidate != NoContext && candidate.isImportContext && importer != null
+      if candidate != NoContext && candidate.isImportContext && importer != null
       then refInfos.sels.put(importer, ())
       if !cached then
         addCached(cachePoint)
