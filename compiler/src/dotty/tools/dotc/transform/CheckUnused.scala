@@ -65,7 +65,14 @@ class CheckUnused private (phaseMode: PhaseMode, suffix: String) extends MiniPha
   // import x.y; x may be rewritten x.y, also import x.z as y
   override def transformSelect(tree: Select)(using Context): tree.type =
     val name = tree.removeAttachment(OriginalName).getOrElse(nme.NO_NAME)
-    if tree.qualifier.span.isSynthetic || name.exists(_ != tree.symbol.name) then
+    if tree.span.isSynthetic && tree.symbol == defn.TypeTest_unapply then
+      tree.qualifier.tpe.underlying.finalResultType match
+      case AppliedType(_, args) => // if tycon.typeSymbol == defn.TypeTestClass
+        val res = args(1)
+        val target = res.dealias.typeSymbol
+        resolveUsage(target, target.name, res.importPrefix.skipPackageObject) // case _: T =>
+      case _ =>
+    else if tree.qualifier.span.isSynthetic || name.exists(_ != tree.symbol.name) then
       if !ignoreTree(tree) then
         resolveUsage(tree.symbol, name, tree.qualifier.tpe)
     else
