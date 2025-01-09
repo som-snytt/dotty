@@ -112,5 +112,5 @@ class Diagnostic(
   override def diagnosticRelatedInformation: JList[interfaces.DiagnosticRelatedInformation] =
     Collections.emptyList()
 
-  override def toString: String = s"$getClass at $pos L${pos.line}: $message"
+  override def toString: String = s"$getClass at $pos L${pos.line+1}: $message"
 end Diagnostic

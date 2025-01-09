@@ -51,7 +51,12 @@ class CheckUnused private (phaseMode: PhaseMode, suffix: String) extends MiniPha
 
   override def transformIdent(tree: Ident)(using Context): tree.type =
     if tree.symbol.exists then
-      if !ignoreTree(tree) then
+      // resolve if inlined at the position of the call, or is zero extent summon
+      val resolving =
+           refInfos.inlined.isEmpty
+        || tree.srcPos.isZeroExtentSynthetic
+        || refInfos.inlined.exists(_.sourcePos.contains(tree.srcPos.sourcePos))
+      if resolving && !ignoreTree(tree) then
         resolveUsage(tree.symbol, tree.name, tree.typeOpt.importPrefix.skipPackageObject)
     else if tree.hasType then
       resolveUsage(tree.tpe.classSymbol, tree.name, tree.tpe.importPrefix.skipPackageObject)
@@ -108,8 +113,12 @@ class CheckUnused private (phaseMode: PhaseMode, suffix: String) extends MiniPha
     case _ =>
     tree
 
+  override def prepareForInlined(tree: Inlined)(using Context): Context =
+    refInfos.inlined.push(tree.call.srcPos)
+    ctx
   override def transformInlined(tree: Inlined)(using Context): tree.type =
-    if !tree.call.isEmpty then
+    val _ = refInfos.inlined.pop()
+    if !tree.call.isEmpty && phaseMode.eq(PhaseMode.Aggregate) then
       transformAllDeep(tree.call)
     tree
 
@@ -432,6 +441,7 @@ object CheckUnused:
           defs.addOne((tree.symbol, tree.srcPos))
 
     var isRepl = false // have we seen a REPL artifact? avoid import warning, for example
+    val inlined = Stack.empty[SrcPos] // enclosing call.srcPos of inlined code
   end RefInfos
 
   // Symbols already resolved in the given Context (with name and prefix of lookup)
@@ -808,6 +818,9 @@ object CheckUnused:
       && imp.expr.tpe.allMembers.exists(_.symbol.isCanEqual)
       || imp.expr.tpe.member(sel.name.toTermName).hasAltWith(_.symbol.isCanEqual)
     )
+
+  extension (pos: SrcPos)
+    def isZeroExtentSynthetic: Boolean = pos.span.isSynthetic && pos.span.start == pos.span.end
 
   // incredibly, there is no "sort in place" for array
   extension [A <: AnyRef](arr: Array[A])
