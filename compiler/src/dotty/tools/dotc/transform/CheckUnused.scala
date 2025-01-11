@@ -124,7 +124,8 @@ class CheckUnused private (phaseMode: PhaseMode, suffix: String) extends MiniPha
     refInfos.inlined.push(tree.call.srcPos)
     ctx
   override def transformInlined(tree: Inlined)(using Context): tree.type =
-    val _ = refInfos.inlined.pop()
+    //val _ = refInfos.inlined.pop()
+    val prev = refInfos.inlined.pop()
     if !tree.call.isEmpty && phaseMode.eq(PhaseMode.Aggregate) then
       transformAllDeep(tree.call)
     tree
@@ -176,10 +177,15 @@ class CheckUnused private (phaseMode: PhaseMode, suffix: String) extends MiniPha
     def trivial = tree.symbol.is(Deferred) || isUnconsuming(tree.rhs)
     def nontrivial = tree.symbol.isConstructor || tree.symbol.isAnonymousFunction
     if !nontrivial && trivial then refInfos.skip.addOne(tree.symbol)
-    refInfos.register(tree)
+    if tree.symbol.is(Inline) then
+      refInfos.inliners += 1
+    else
+      refInfos.register(tree)
     ctx
   override def transformDefDef(tree: DefDef)(using Context): tree.type =
     traverseAnnotations(tree.symbol)
+    if tree.symbol.is(Inline) then
+      refInfos.inliners -= 1
     tree
 
   override def transformTypeDef(tree: TypeDef)(using Context): tree.type =
@@ -427,10 +433,11 @@ object CheckUnused:
     val skip = mutable.Set.empty[Symbol]              // methods to skip (don't warn about their params)
     val imps = new IdentityHashMap[Import, Unit]         // imports
     val sels = new IdentityHashMap[ImportSelector, Unit] // matched selectors
-    def register(tree: Tree)(using Context): Unit =
+    def register(tree: Tree)(using Context): Unit = if inlined.isEmpty then
       tree match
       case imp: Import =>
-        if languageImport(imp.expr).isEmpty
+        if inliners == 0
+          && languageImport(imp.expr).isEmpty
           && !imp.isGeneratedByEnum
         then
           imps.put(imp, ())
@@ -449,6 +456,7 @@ object CheckUnused:
 
     var isRepl = false // have we seen a REPL artifact? avoid import warning, for example
     val inlined = Stack.empty[SrcPos] // enclosing call.srcPos of inlined code
+    var inliners = 0 // depth of inline def
   end RefInfos
 
   // Symbols already resolved in the given Context (with name and prefix of lookup)
