@@ -32,8 +32,13 @@ class A {
     y + g
 
   def g(x: Int): Int = x match
-    case x: 1 => 0 // warn
+    case x: 1 => 0 // no warn same name as selector (for shadowing or unused)
     case x: 2 => x // OK
+    case _    => 1 // OK
+
+  def h(x: Int): Int = x match
+    case y: 1 => 0 // warn unused despite trivial type and RHS
+    case y: 2 => y // OK
     case _    => 1 // OK
 }
 

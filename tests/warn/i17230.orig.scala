@@ -1,4 +1,3 @@
-//> using options -Werror
 import scala.util.*
 
 trait Transaction {

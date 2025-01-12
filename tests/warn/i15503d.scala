@@ -92,3 +92,9 @@ def untuple(t: Tuple) =
   case Tuple() =>
   case h *: t => // no warn canonical names taken from tuple element types, (Head, Tail) -> (head, tail)
   //case head *: tail => // no warn canonical names taken from tuple element types, (Head, Tail) -> (head, tail)
+
+// empty case class:
+// def equals(other) = other match { case other => true } // exonerated name
+object i15967:
+  sealed trait A[-Z]
+  final case class B[Y]() extends A[Y]

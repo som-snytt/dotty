@@ -59,7 +59,7 @@ class Revaluing(u: Int) { def f = u } // OK
 
 case class CaseyKasem(k: Int)        // OK
 
-case class CaseyAtTheBat(k: Int)(s: String)        // ok
+case class CaseyAtTheBat(k: Int)(s: String)        // warn unused s
 
 trait Ignorance {
   def f(readResolve: Int) = answer  // warn now
@@ -94,14 +94,14 @@ trait Anonymous {
 
   def f2: Int => Int = _ + 1  // OK
 
-  def g = for (i <- List(1)) yield answer    // warn
+  def g = for (i <- List(1)) yield answer    // no warn (that is a patvar)
 }
 trait Context[A]
 trait Implicits {
-  def f[A](implicit ctx: Context[A]) = answer // warn
-  def g[A: Context] = answer // warn
+  def f[A](implicit ctx: Context[A]) = answer // warn implicit param even though only marker
+  def g[A: Context] = answer // no warn bound that is marker only
 }
-class Bound[A: Context] // warn
+class Bound[A: Context] // no warn bound that is marker only
 object Answers {
   def answer: Int = 42
 }

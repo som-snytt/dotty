@@ -1,4 +1,3 @@
-//> using options -Werror
 trait Foo:
   type Bar[_]
 

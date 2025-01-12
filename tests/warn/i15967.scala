@@ -1,4 +1,3 @@
-//> using options -Werror
 sealed trait A[-Z]
 final case class B[Y]() extends A[Y]
 

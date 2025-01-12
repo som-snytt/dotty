@@ -107,6 +107,12 @@ class CheckUnused private (phaseMode: PhaseMode, suffix: String) extends MiniPha
       refInfos.asss.addOne(sym)
     tree
 
+  override def prepareForMatch(tree: Match)(using Context): Context =
+    // exonerate case.pat against tree.selector (simple var pat only for now)
+    tree.selector match
+    case Ident(nm) => tree.cases.foreach(k => absolveVariableBindings(List(nm), List(k.pat)))
+    case _ =>
+    ctx
   override def transformMatch(tree: Match)(using Context): tree.type =
     if tree.isInstanceOf[InlineMatch] && tree.selector.isEmpty then
       val sf = defn.Compiletime_summonFrom
@@ -195,8 +201,6 @@ class CheckUnused private (phaseMode: PhaseMode, suffix: String) extends MiniPha
     tree
 
   override def prepareForTemplate(tree: Template)(using Context): Context =
-    if tree.symbol.name.isReplWrapperName then
-      refInfos.isRepl = true
     ctx.fresh.setProperty(resolvedKey, Resolved())
 
   override def prepareForPackageDef(tree: PackageDef)(using Context): Context =
@@ -439,6 +443,7 @@ object CheckUnused:
         if inliners == 0
           && languageImport(imp.expr).isEmpty
           && !imp.isGeneratedByEnum
+          && !ctx.outer.owner.name.isReplWrapperName
         then
           imps.put(imp, ())
       case tree: Bind =>
@@ -454,7 +459,6 @@ object CheckUnused:
         if tree.symbol ne NoSymbol then
           defs.addOne((tree.symbol, tree.srcPos))
 
-    var isRepl = false // have we seen a REPL artifact? avoid import warning, for example
     val inlined = Stack.empty[SrcPos] // enclosing call.srcPos of inlined code
     var inliners = 0 // depth of inline def
   end RefInfos
@@ -582,7 +586,7 @@ object CheckUnused:
     // TODO check for unused masking import
     import scala.jdk.CollectionConverters.given
     import Rewrites.ActionPatch
-    if (ctx.settings.WunusedHas.imports || ctx.settings.WunusedHas.strictNoImplicitWarn) && !infos.isRepl then
+    if ctx.settings.WunusedHas.imports || ctx.settings.WunusedHas.strictNoImplicitWarn then
       type ImpSel = (Import, ImportSelector)
       def isUsable(imp: Import, sel: ImportSelector): Boolean =
         sel.isImportExclusion || infos.sels.containsKey(sel) || imp.isLoose(sel)
@@ -626,7 +630,7 @@ object CheckUnused:
           val selector = textAt(sel.srcPos)  // keep original
           s"$qual.$selector"                 // don't succumb to vagaries of show
         // begin actionable
-        val sortedImps = infos.imps.keySet.nn.asScala.toArray.sorta(_.srcPos.span.point) // sorted by pos
+        val sortedImps = infos.imps.keySet.nn.asScala.toArray.sortBy(_.srcPos.span.point) // sorted by pos
         var index = 0
         while index < sortedImps.length do
           val nextImport = sortedImps.indexSatisfying(from = index + 1)(_.isPrimaryClause) // next import statement
@@ -706,20 +710,21 @@ object CheckUnused:
           index = nextImport
         end while
 
-    warnings.result().sorta(_._2.span.point)
+    warnings.result().sortBy(_._2.span.point)
   end warnings
 
   // Specific exclusions
   def ignoreTree(tree: Tree): Boolean =
     tree.hasAttachment(ForArtifact) || tree.hasAttachment(Ignore)
 
+  def absolveVariableBindings(ok: List[Name], args: List[Tree]): Unit =
+    ok.zip(args).foreach: (param, arg) =>
+      arg match
+      case Bind(`param`, _) => arg.withAttachment(NoWarn, ())
+      case _ =>
+
   // NoWarn Binds if the name matches a "canonical" name, e.g. case element name
   val nowarner = new TreeTraverser:
-    def absolveVariableBindings(ok: List[Name], args: List[Tree]): Unit =
-      ok.zip(args).foreach: (param, arg) =>
-        arg match
-        case Bind(`param`, _) => arg.withAttachment(NoWarn, ())
-        case _ =>
     def traverse(tree: Tree)(using Context) = tree match
       case UnApply(fun, _, args) =>
         def untuple = defn.PairClass.companionModule.requiredMethod("unapply")
@@ -837,15 +842,7 @@ object CheckUnused:
   extension (pos: SrcPos)
     def isZeroExtentSynthetic: Boolean = pos.span.isSynthetic && pos.span.start == pos.span.end
 
-  // incredibly, there is no "sort in place" for array
   extension [A <: AnyRef](arr: Array[A])
-    def sorta[B](f: A => B)(using ord: Ordering[B]): arr.type =
-      import java.util.{Arrays, Comparator}
-      val cmp = new Comparator[A] {
-        def compare(x: A, y: A): Int = ord.compare(f(x), f(y))
-      }
-      Arrays.sort(arr.asInstanceOf[Array[Object]], cmp.asInstanceOf[Comparator[Object]])
-      arr
     // returns `until` if not satisfied
     def indexSatisfying(from: Int, until: Int = arr.length)(p: A => Boolean): Int =
       var i = from
