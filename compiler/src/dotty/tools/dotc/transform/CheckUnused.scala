@@ -841,10 +841,10 @@ object CheckUnused:
   extension [A <: AnyRef](arr: Array[A])
     def sorta[B](f: A => B)(using ord: Ordering[B]): arr.type =
       import java.util.{Arrays, Comparator}
-      val cmp = new Comparator[A | Null] {
+      val cmp = new Comparator[A] {
         def compare(x: A, y: A): Int = ord.compare(f(x), f(y))
       }
-      Arrays.sort(arr.asInstanceOf[Array[A | Null]], cmp)
+      Arrays.sort(arr.asInstanceOf[Array[Object]], cmp.asInstanceOf[Comparator[Object]])
       arr
     // returns `until` if not satisfied
     def indexSatisfying(from: Int, until: Int = arr.length)(p: A => Boolean): Int =
