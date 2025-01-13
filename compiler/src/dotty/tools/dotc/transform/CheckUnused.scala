@@ -176,6 +176,7 @@ class CheckUnused private (phaseMode: PhaseMode, suffix: String) extends MiniPha
                     contextual.is(ContextFunctionParamName)
                  && isUnconsuming(dd.rhs)
                case _ => false
+          case Block(Nil, Literal(u)) => u.tpe =:= defn.UnitType
           case This(_) => true
           case Ident(_) => rhs.symbol.is(ParamAccessor)
           case Typed(rhs, _) => isUnconsuming(rhs)

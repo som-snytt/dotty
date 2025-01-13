@@ -43,6 +43,7 @@ package foo.test.trivial:
     object X
     private def g0(x: Int) = ??? // OK
     private def f0(x: Int) = () // OK
+    private def f00(x: Int) = {} // OK
     private def f1(x: Int) = throw new RuntimeException // OK
     private def f2(x: Int) = 42 // OK
     private def f3(x: Int): Option[Int] = None // OK
