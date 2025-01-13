@@ -575,7 +575,7 @@ Text => empty
 Language => Scala
 Symbols => 108 entries
 Occurrences => 127 entries
-Diagnostics => 10 entries
+Diagnostics => 11 entries
 Synthetics => 2 entries
 
 Symbols:
@@ -818,6 +818,7 @@ Occurrences:
 [53:10..53:11): + -> scala/Int#`+`(+4).
 
 Diagnostics:
+[13:20..13:21): [warning] unused explicit parameter
 [18:9..18:10): [warning] unused explicit parameter
 [20:23..20:23): [warning] Ignoring [this] qualifier.
 This syntax will be deprecated in the future; it should be dropped.
@@ -2099,6 +2100,7 @@ Text => empty
 Language => Scala
 Symbols => 45 entries
 Occurrences => 66 entries
+Diagnostics => 1 entries
 Synthetics => 3 entries
 
 Symbols:
@@ -2215,6 +2217,9 @@ Occurrences:
 [41:4..41:5): z <- givens/InventedNames$package.z.
 [41:8..41:17): given_Z_T -> givens/InventedNames$package.given_Z_T().
 [41:18..41:24): String -> scala/Predef.String#
+
+Diagnostics:
+[24:13..24:13): [warning] unused implicit parameter
 
 Synthetics:
 [24:0..24:0): => *(x$1)
@@ -3537,7 +3542,7 @@ Text => empty
 Language => Scala
 Symbols => 62 entries
 Occurrences => 165 entries
-Diagnostics => 2 entries
+Diagnostics => 3 entries
 Synthetics => 39 entries
 
 Symbols:
@@ -3772,8 +3777,9 @@ Occurrences:
 [68:30..68:31): s -> local16
 
 Diagnostics:
-[19:21..19:22): [warning] unused explicit parameter
-[41:4..41:5): [warning] unused explicit parameter
+[19:21..19:22): [warning] unused pattern variable
+[41:4..41:5): [warning] unused pattern variable
+[63:10..63:11): [warning] unused explicit parameter
 
 Synthetics:
 [5:2..5:13):List(1).map => *[Int]
@@ -3936,7 +3942,6 @@ Text => empty
 Language => Scala
 Symbols => 22 entries
 Occurrences => 45 entries
-Diagnostics => 3 entries
 Synthetics => 11 entries
 
 Symbols:
@@ -4009,11 +4014,6 @@ Occurrences:
 [38:10..38:20): number1Var -> local5
 [39:10..39:17): leftVar -> local3
 [40:10..40:18): rightVar -> local4
-
-Diagnostics:
-[30:11..30:18): [warning] unset local variable, consider using an immutable val instead
-[30:20..30:28): [warning] unset local variable, consider using an immutable val instead
-[31:15..31:25): [warning] unset local variable, consider using an immutable val instead
 
 Synthetics:
 [5:6..5:10):Some => *.unapply[Int]
@@ -4634,6 +4634,7 @@ Text => empty
 Language => Scala
 Symbols => 24 entries
 Occurrences => 63 entries
+Diagnostics => 2 entries
 
 Symbols:
 _empty_/Copy# => trait Copy [typeparam In  <: Txn[In], typeparam Out  <: Txn[Out]] extends Object { self: Copy[In, Out] => +5 decls }
@@ -4725,6 +4726,10 @@ Occurrences:
 [13:40..13:43): Out -> _empty_/Copy#[Out]
 [14:8..14:15): println -> scala/Predef.println(+1).
 [17:4..17:7): out -> local0
+
+Diagnostics:
+[13:12..13:17): [warning] unused pattern variable
+[13:28..13:34): [warning] unused pattern variable
 
 expect/inlineconsume.scala
 --------------------------
@@ -4887,7 +4892,6 @@ Text => empty
 Language => Scala
 Symbols => 36 entries
 Occurrences => 48 entries
-Diagnostics => 5 entries
 
 Symbols:
 local0 => type N$1  <: Nat
@@ -4977,13 +4981,6 @@ Occurrences:
 [23:35..23:39): Zero -> recursion/Nats.Zero.
 [23:40..23:42): ++ -> recursion/Nats.Nat#`++`().
 
-Diagnostics:
-[10:24..10:24): [warning] unused local definition
-[10:33..11:5): [warning] unused local definition
-[23:19..23:19): [warning] unused local definition
-[23:24..23:32): [warning] unused local definition
-[23:40..25:2): [warning] unused local definition
-
 expect/semanticdb-Definitions.scala
 -----------------------------------
 
@@ -5028,7 +5025,7 @@ Text => empty
 Language => Scala
 Symbols => 50 entries
 Occurrences => 78 entries
-Diagnostics => 5 entries
+Diagnostics => 6 entries
 Synthetics => 2 entries
 
 Symbols:
@@ -5164,11 +5161,12 @@ Occurrences:
 [25:33..25:36): ??? -> scala/Predef.`???`().
 
 Diagnostics:
-[5:19..5:20): [warning] unused private member
 [9:30..9:31): [warning] unused explicit parameter
 [9:36..9:37): [warning] unused explicit parameter
 [9:42..9:43): [warning] unused explicit parameter
 [21:11..21:12): [warning] unused explicit parameter
+[24:24..24:27): [warning] unused pattern variable
+[25:27..25:28): [warning] unused pattern variable
 
 Synthetics:
 [23:6..23:10):List => *.unapplySeq[Nothing]
@@ -5184,7 +5182,7 @@ Text => empty
 Language => Scala
 Symbols => 143 entries
 Occurrences => 246 entries
-Diagnostics => 5 entries
+Diagnostics => 4 entries
 Synthetics => 1 entries
 
 Symbols:
@@ -5581,7 +5579,6 @@ Occurrences:
 [119:39..119:42): Int -> scala/Int#
 
 Diagnostics:
-[5:13..5:14): [warning] unused explicit parameter
 [62:25..62:29): [warning] with as a type operator has been deprecated; use & instead
 This construct can be rewritten automatically under -rewrite -source 3.4-migration.
 [63:25..63:29): [warning] with as a type operator has been deprecated; use & instead
