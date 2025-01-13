@@ -304,3 +304,7 @@ object `i19998 refinement`:
     private final type SelfX[a] = X[a] // was false positive
     val foo: Foo { type X[a] = SelfX[a] }
   }
+
+object `patvar is assignable`:
+  private var (i, j) = (42, 27) // no warn patvars under -Wunused:privates
+  println((i, j))

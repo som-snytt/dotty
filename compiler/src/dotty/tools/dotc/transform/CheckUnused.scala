@@ -141,7 +141,8 @@ class CheckUnused private (phaseMode: PhaseMode, suffix: String) extends MiniPha
     ctx
 
   override def prepareForValDef(tree: ValDef)(using Context): Context =
-    refInfos.register(tree)
+    if !tree.symbol.is(Deferred) && tree.rhs.symbol != defn.Predef_undefined then
+      refInfos.register(tree)
     ctx
   override def transformValDef(tree: ValDef)(using Context): tree.type =
     traverseAnnotations(tree.symbol)
@@ -158,35 +159,12 @@ class CheckUnused private (phaseMode: PhaseMode, suffix: String) extends MiniPha
     tree
 
   override def prepareForDefDef(tree: DefDef)(using Context): Context =
-    def isUnconsuming(rhs: Tree): Boolean =
-          rhs.symbol == defn.Predef_undefined
-       || rhs.tpe =:= defn.NothingType
-       || rhs.isInstanceOf[Literal]
-       || rhs.tpe.match
-          case ConstantType(_) => true
-          case tp: TermRef => tp.underlying.classSymbol.is(Module) // Scala 2 SingleType
-          case _ => false
-       //|| isPurePath(rhs) // a bit strong
-       || rhs.match
-          case Block((dd @ DefDef(anonfun, paramss, _, _)) :: Nil, Closure(Nil, Ident(nm), _)) =>
-               isAnonymousFunctionName(anonfun)
-            && anonfun == nm
-            && paramss.match
-               case (ValDef(contextual, _, _) :: Nil) :: Nil =>
-                    contextual.is(ContextFunctionParamName)
-                 && isUnconsuming(dd.rhs)
-               case _ => false
-          case Block(Nil, Literal(u)) => u.tpe =:= defn.UnitType
-          case This(_) => true
-          case Ident(_) => rhs.symbol.is(ParamAccessor)
-          case Typed(rhs, _) => isUnconsuming(rhs)
-          case _ => false
     def trivial = tree.symbol.is(Deferred) || isUnconsuming(tree.rhs)
     def nontrivial = tree.symbol.isConstructor || tree.symbol.isAnonymousFunction
     if !nontrivial && trivial then refInfos.skip.addOne(tree.symbol)
     if tree.symbol.is(Inline) then
       refInfos.inliners += 1
-    else
+    else if !tree.symbol.is(Deferred) && tree.rhs.symbol != defn.Predef_undefined then
       refInfos.register(tree)
     ctx
   override def transformDefDef(tree: DefDef)(using Context): tree.type =
@@ -575,14 +553,24 @@ object CheckUnused:
           warnAt(pos)(UnusedSymbol.localDefs)
 
     if ctx.settings.WunusedHas.patvars then
-      // convert the one non-synthetic so all are comparable
+      // convert the one non-synthetic span so all are comparable
       def uniformPos(sym: Symbol, pos: SrcPos): SrcPos =
         if pos.span.isSynthetic then pos else pos.sourcePos.withSpan(pos.span.toSynthetic)
-      // patvars in for comprehensions have the pos of where the name was introduced
+      // patvars in for comprehensions share the pos of where the name was introduced
       val byPos = infos.pats.groupMap(uniformPos(_, _))((sym, pos) => sym)
       for (pos, syms) <- byPos if !syms.exists(_.hasAnnotation(defn.UnusedAnnot)) do
-        if !syms.exists(infos.refs(_)) && !syms.exists(v => !v.isLocal && !v.is(Private)) then
-          warnAt(pos)(UnusedSymbol.patVars)
+        if !syms.exists(infos.refs(_)) then
+          if !syms.exists(v => !v.isLocal && !v.is(Private)) then
+            warnAt(pos)(UnusedSymbol.patVars)
+        else if syms.exists(_.is(Mutable)) then // check unassigned var
+          val sym = // recover the original
+            if syms.size == 1 then syms.head
+            else infos.pats.find((s, p) => syms.contains(s) && !p.span.isSynthetic).map(_._1).getOrElse(syms.head)
+          if sym.is(Mutable) && !infos.asss(sym) then
+            if sym.isLocalToBlock then
+              warnAt(pos)(UnusedSymbol.unsetLocals)
+            else if sym.is(Private) then
+              warnAt(pos)(UnusedSymbol.unsetPrivates)
 
     // TODO check for unused masking import
     import scala.jdk.CollectionConverters.given
@@ -717,6 +705,31 @@ object CheckUnused:
   // Specific exclusions
   def ignoreTree(tree: Tree): Boolean =
     tree.hasAttachment(ForArtifact) || tree.hasAttachment(Ignore)
+
+  // The RHS of a def is too trivial to warn about unused params, e.g. def f(x: Int) = ???
+  def isUnconsuming(rhs: Tree)(using Context): Boolean =
+        rhs.symbol == defn.Predef_undefined
+     || rhs.tpe =:= defn.NothingType
+     || rhs.isInstanceOf[Literal]
+     || rhs.tpe.match
+        case ConstantType(_) => true
+        case tp: TermRef => tp.underlying.classSymbol.is(Module) // Scala 2 SingleType
+        case _ => false
+     //|| isPurePath(rhs) // a bit strong
+     || rhs.match
+        case Block((dd @ DefDef(anonfun, paramss, _, _)) :: Nil, Closure(Nil, Ident(nm), _)) =>
+             isAnonymousFunctionName(anonfun)
+          && anonfun == nm
+          && paramss.match
+             case (ValDef(contextual, _, _) :: Nil) :: Nil =>
+                  contextual.is(ContextFunctionParamName)
+               && isUnconsuming(dd.rhs)
+             case _ => false
+        case Block(Nil, Literal(u)) => u.tpe =:= defn.UnitType
+        case This(_) => true
+        case Ident(_) => rhs.symbol.is(ParamAccessor)
+        case Typed(rhs, _) => isUnconsuming(rhs)
+        case _ => false
 
   def absolveVariableBindings(ok: List[Name], args: List[Tree]): Unit =
     ok.zip(args).foreach: (param, arg) =>

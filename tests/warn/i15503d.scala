@@ -98,3 +98,25 @@ def untuple(t: Tuple) =
 object i15967:
   sealed trait A[-Z]
   final case class B[Y]() extends A[Y]
+
+object `patvar is assignable`:
+  var (i, j) = (42, 27) // no warn nonprivate
+  j += 1
+  println((i, j))
+
+object `privy patvar is assignable`:
+  private var (i, j) = (42, 27) // warn
+  j += 1
+  println((i, j))
+
+object `local patvar is assignable`:
+  def f() =
+    var (i, j) = (42, 27) // warn
+    j += 1
+    println((i, j))
+
+object `mutable patvar in for`:
+  def f(xs: List[Int]) =
+    for x <- xs; y = x + 1 if y > 10 yield
+      var z :: Nil = y :: Nil: @unchecked // warn
+      z + 10

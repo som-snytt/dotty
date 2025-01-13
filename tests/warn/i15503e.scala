@@ -90,3 +90,6 @@ object UnwrapTyped:
 
   transparent inline def codeOf(arg: Any): String =
     error("Compiler bug: `codeOf` was not evaluated by the compiler")
+
+object `default usage`:
+  def f(i: Int)(j: Int = i * 2) = j // warn I guess
