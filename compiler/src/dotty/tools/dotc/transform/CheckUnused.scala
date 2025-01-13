@@ -130,8 +130,7 @@ class CheckUnused private (phaseMode: PhaseMode, suffix: String) extends MiniPha
     refInfos.inlined.push(tree.call.srcPos)
     ctx
   override def transformInlined(tree: Inlined)(using Context): tree.type =
-    //val _ = refInfos.inlined.pop()
-    val prev = refInfos.inlined.pop()
+    val _ = refInfos.inlined.pop()
     if !tree.call.isEmpty && phaseMode.eq(PhaseMode.Aggregate) then
       transformAllDeep(tree.call)
     tree
@@ -466,7 +465,7 @@ object CheckUnused:
         if sym.isLocalToBlock then
           if ctx.settings.WunusedHas.locals && sym.is(Mutable) && !infos.asss(sym) then
             warnAt(pos)(UnusedSymbol.unsetLocals)
-        else if sym.isAllOf(Private | Mutable) && !infos.asss(sym) then
+        else if ctx.settings.WunusedHas.privates && sym.isAllOf(Private | Mutable) && !infos.asss(sym) then
           warnAt(pos)(UnusedSymbol.unsetPrivates)
       else if sym.is(Private, butNot = ParamAccessor) then
         if ctx.settings.WunusedHas.privates

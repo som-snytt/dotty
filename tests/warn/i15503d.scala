@@ -120,3 +120,7 @@ object `mutable patvar in for`:
     for x <- xs; y = x + 1 if y > 10 yield
       var z :: Nil = y :: Nil: @unchecked // warn
       z + 10
+
+class `unset var requires -Wunused`:
+  private var i = 0 // no warn as we didn't ask for it
+  def f = println(i)
