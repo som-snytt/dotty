@@ -5,7 +5,7 @@ import java.io.File
 import java.nio.file.Files
 
 import ast.tpd.*
-import collection.mutable
+import collection.mutable.ListBuffer
 import core.Flags.*
 import core.Contexts.{Context, ctx, inContext}
 import core.DenotTransformers.IdentityDenotTransformer
@@ -215,9 +215,8 @@ class InstrumentCoverage extends MacroTransform with IdentityDenotTransformer:
           // Lifts the arguments. Note that if only one argument needs to be lifted, we lift them all.
           // Also, tree.fun can be lifted too.
           // See LiftCoverage for the internal working of this lifting.
-          val liftedDefs = mutable.ListBuffer[Tree]()
+          val liftedDefs = ListBuffer.empty[Tree]
           val liftedApp = LiftCoverage.liftForCoverage(liftedDefs, app)
-
           InstrumentedParts(liftedDefs.toList, coverageCall, liftedApp)
         else
           // Instrument without lifting

@@ -1,0 +1,139 @@
+# Coverage data, format version: 3.0
+# Statement data:
+# - id
+# - source path
+# - package name
+# - class name
+# - class type (Class, Object or Trait)
+# - full class name
+# - method name
+# - start offset
+# - end offset
+# - line number
+# - symbol name
+# - tree name
+# - is branch
+# - invocations count
+# - is ignored
+# - description (can be multi-line)
+# '' sign
+# ------------------------------------------
+0
+i22834/i22834.scala
+<empty>
+i22834$package
+Object
+<empty>.i22834$package
+Test
+105
+211
+4
+println
+Apply
+false
+0
+false
+println:\n  val m = new java.util.HashMap[String, Double]()\n  def f: Option[Double] = Option(m.get(""))\n  f
+
+1
+i22834/i22834.scala
+<empty>
+i22834$package
+Object
+<empty>.i22834$package
+Test
+124
+163
+4
+<init>
+Apply
+false
+0
+false
+new java.util.HashMap[String, Double]()
+
+2
+i22834/i22834.scala
+<empty>
+i22834$package
+Object
+<empty>.i22834$package
+f
+190
+207
+5
+apply
+Apply
+false
+0
+false
+Option(m.get(""))
+
+3
+i22834/i22834.scala
+<empty>
+i22834$package
+Object
+<empty>.i22834$package
+f
+197
+206
+5
+get
+Apply
+false
+0
+false
+m.get("")
+
+4
+i22834/i22834.scala
+<empty>
+i22834$package
+Object
+<empty>.i22834$package
+f
+166
+171
+5
+f
+DefDef
+false
+0
+false
+def f
+
+5
+i22834/i22834.scala
+<empty>
+i22834$package
+Object
+<empty>.i22834$package
+Test
+210
+211
+6
+f
+Ident
+false
+0
+false
+f
+
+6
+i22834/i22834.scala
+<empty>
+i22834$package
+Object
+<empty>.i22834$package
+Test
+88
+102
+3
+Test
+DefDef
+false
+0
+false
+@main def Test
+
