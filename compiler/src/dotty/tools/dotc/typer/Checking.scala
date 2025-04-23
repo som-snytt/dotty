@@ -793,6 +793,8 @@ object Checking {
             report.error(ValueClassNeedsOneValParam(clazz), clazz.srcPos)
         }
       }
+      if !clazz.companionModule.info.decls.exists(_.isConstructor) then
+        report.error(em"$clazz has no companion. Value classes must extend unaliased `scala.AnyVal`.", clazz.srcPos)
       stats.foreach(checkValueClassMember)
     }
   }
