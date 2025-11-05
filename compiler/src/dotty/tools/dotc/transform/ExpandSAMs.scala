@@ -155,7 +155,8 @@ class ExpandSAMs extends MiniPhase:
       val isDefinedAtFn = overrideSym(defn.PartialFunction_isDefinedAt)
       val applyOrElseFn = overrideSym(defn.PartialFunction_applyOrElse)
 
-      def translateMatch(tree: Match, pfParam: Symbol, cases: List[CaseDef], defaultValue: Tree)(using Context) = {
+      def translateMatch(owner: Symbol)(pfParam: Symbol, cases: List[CaseDef], defaultValue: Tree)(using Context) = {
+        val tree: Match = pfRHS
         val selector = tree.selector
         val cases1 = if cases.exists(isDefaultCase) then cases
         else
@@ -168,23 +169,21 @@ class ExpandSAMs extends MiniPhase:
             // Needed because  a partial function can be written as:
             // param => param match { case "foo" if foo(param) => param }
             // And we need to update all references to 'param'
+          .changeOwner(anonSym, owner)
       }
 
       def isDefinedAtRhs(paramRefss: List[List[Tree]])(using Context) = {
         val tru = Literal(Constant(true))
-        def translateCase(cdef: CaseDef) =
-          cpy.CaseDef(cdef)(body = tru).changeOwner(anonSym, isDefinedAtFn)
+        def translateCase(cdef: CaseDef) = cpy.CaseDef(cdef)(body = tru)//.changeOwner(anonSym, isDefinedAtFn)
         val paramRef = paramRefss.head.head
         val defaultValue = Literal(Constant(false))
-        translateMatch(pfRHS, paramRef.symbol, pfRHS.cases.map(translateCase), defaultValue)
+        translateMatch(isDefinedAtFn)(paramRef.symbol, pfRHS.cases.map(translateCase), defaultValue)
       }
 
       def applyOrElseRhs(paramRefss: List[List[Tree]])(using Context) = {
         val List(paramRef, defaultRef) = paramRefss(1)
-        def translateCase(cdef: CaseDef) =
-          cdef.changeOwner(anonSym, applyOrElseFn)
         val defaultValue = defaultRef.select(nme.apply).appliedTo(paramRef)
-        translateMatch(pfRHS, paramRef.symbol, pfRHS.cases.map(translateCase), defaultValue)
+        translateMatch(applyOrElseFn)(paramRef.symbol, pfRHS.cases, defaultValue)
       }
 
       val isDefinedAtDef = transformFollowingDeep(DefDef(isDefinedAtFn, isDefinedAtRhs(_)(using ctx.withOwner(isDefinedAtFn))))
