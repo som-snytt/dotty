@@ -1,17 +1,20 @@
 package dotty.tools.scaladoc
 package translators
 
-case class SignatureBuilder(content: Signature = Nil) extends ScalaSignatureUtils:
-  def plain(str: String): SignatureBuilder = copy(content = content :+ Plain(str))
+import scala.util.chaining.*
+import ScalaSignatureUtils.*
+
+class SignatureBuilder(val content: Signature):
+  def plain(str: String): SignatureBuilder = SignatureBuilder(content :+ Plain(str))
   def name(str: String, dri: DRI, isCaptureVar: Boolean = false/*under CC*/): SignatureBuilder =
     val suffix = if isCaptureVar then List(Keyword("^")) else Nil
-    copy(content = content ++ (Name(str, dri) :: suffix))
+    SignatureBuilder(content ++ (Name(str, dri) :: suffix))
   def tpe(text: String, dri: Option[DRI], isCaptureVar: Boolean = false/*under CC*/): SignatureBuilder =
     val suffix = if isCaptureVar then List(Keyword("^")) else Nil
-    copy(content = content ++ (Type(text, dri) :: suffix))
-  def keyword(str: String): SignatureBuilder = copy(content = content :+ Keyword(str))
-  def tpe(text: String, dri: DRI): SignatureBuilder = copy(content = content :+ Type(text, Some(dri)))
-  def signature(s: Signature): SignatureBuilder = copy(content = content ++ s)
+    SignatureBuilder(content ++ (Type(text, dri) :: suffix))
+  def keyword(str: String): SignatureBuilder = SignatureBuilder(content :+ Keyword(str))
+  def tpe(text: String, dri: DRI): SignatureBuilder = SignatureBuilder(content :+ Type(text, Some(dri)))
+  def signature(s: Signature): SignatureBuilder = SignatureBuilder(content ++ s)
 
   def list[E](
     elements: Seq[E],
@@ -24,7 +27,10 @@ case class SignatureBuilder(content: Signature = Nil) extends ScalaSignatureUtil
   ): SignatureBuilder = elements match {
     case Nil => if forcePrefixAndSuffix then signature(prefix).signature(suffix) else this
     case head :: tail =>
-      tail.foldLeft(elemOp(signature(prefix), head))((b, e) => elemOp(b.signature(separator), e)).signature(suffix)
+      tail
+        .foldLeft(elemOp(signature(prefix), head)): (b, e) =>
+          elemOp(b.signature(separator), e)
+        .signature(suffix)
   }
 
   def annotationsBlock(d: Member): SignatureBuilder =
@@ -86,12 +92,17 @@ case class SignatureBuilder(content: Signature = Nil) extends ScalaSignatureUtil
     }
 
   def termParamList(params: TermParameterList) =
-    this.list(params.parameters, prefix = List(Plain("("), Keyword(params.modifiers)), suffix = List(Plain(")")), forcePrefixAndSuffix = true) { (bld, p) =>
-      val annotationsAndModifiers = bld.annotationsInline(p)
-        .keyword(p.modifiers)
-      val name = p.name.fold(annotationsAndModifiers)(annotationsAndModifiers.name(_, p.dri).plain(": "))
+    val prefix = List(Plain("("), Keyword(params.modifiers))
+    val suffix = List(Plain(")"))
+    list(params.parameters, prefix = prefix, suffix = suffix, forcePrefixAndSuffix = true): (bld, p) =>
+      val annotationsAndModifiers =
+        bld.annotationsInline(p)
+          .keyword(p.modifiers)
+      val name =
+        p.name
+          .fold(annotationsAndModifiers): s =>
+            annotationsAndModifiers.name(s, p.dri).plain(": ")
       name.signature(p.signature)
-    }
 
   def typeParamList(on: TypeParameterList) = list(on.toList, List(Plain("[")), List(Plain("]"))){ (bdr, e) =>
     bdr.annotationsInline(e).keyword(e.variance).tpe(e.name, Some(e.dri), e.isCaptureVar).signature(e.signature)
@@ -100,6 +111,6 @@ case class SignatureBuilder(content: Signature = Nil) extends ScalaSignatureUtil
   def functionTermParameters(paramss: Seq[TermParameterList]) =
     this.list(paramss, separator = List(Plain(""))) { (bld, pList) => bld.termParamList(pList) }
 
-trait ScalaSignatureUtils:
+object ScalaSignatureUtils:
   extension (tokens: Seq[String]) def toSignatureString(): String =
     tokens.filter(_.trim.nonEmpty).mkString(""," "," ")

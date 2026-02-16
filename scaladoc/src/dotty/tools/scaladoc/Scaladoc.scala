@@ -99,7 +99,7 @@ object Scaladoc:
     val newContext = rootCtx.fresh
     given CompilerContext = newContext
     val ss = ScaladocSettings()
-    import ss._
+    import ss.*
     val summary = ScaladocCommand.distill(args, ss)()
     val argumentFilesOrNone = ScaladocCommand.checkUsage(summary, true)(using ss)(using summary.sstate)
 
@@ -123,7 +123,10 @@ object Scaladoc:
     val (shared, other) = allSettings
       .filter(s => !s.isDefaultIn(summary.sstate))
       .filter(allScalaSettings.contains)
-      .partition(commonScalaSettings.contains)
+      .partition: setting =>
+        commonScalaSettings.contains(setting)
+        || setting == Wconf
+        || setting == Werror
     shared.foreach(setInGlobal)
 
     if !other.isEmpty then report.echo(s"Skipping unused scalacOptions: ${other.map(_.name).mkString(", ")}")

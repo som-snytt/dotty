@@ -172,11 +172,11 @@ trait Resources(using ctx: DocContext) extends Locations, Writer:
     def extensionTarget(member: Member): String =
       member.kind match
         case Kind.Extension(on, _) =>
-          val typeSig = SignatureBuilder()
+          val typeSig = SignatureBuilder(Nil)
             .keyword("extension ")
             .typeParamList(on.typeParams)
             .content
-          val argsSig = SignatureBuilder()
+          val argsSig = SignatureBuilder(Nil)
             .functionTermParameters(on.argsLists)
             .content
           flattenToText(typeSig ++ argsSig)

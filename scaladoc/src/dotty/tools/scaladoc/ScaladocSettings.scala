@@ -1,10 +1,10 @@
 package dotty.tools.scaladoc
 
-import dotty.tools.dotc.config.Settings._
+import dotty.tools.dotc.config.Settings.*
 import dotty.tools.dotc.config.AllScalaSettings
 import dotty.tools.dotc.config.ScalaSettingCategories.RootSetting
 
-class ScaladocSettings extends SettingGroup with AllScalaSettings:
+class ScaladocSettings extends SettingGroup, AllScalaSettings:
   val unsupportedSettings = Seq(
     // Needed for plugin architecture
     plugin, disable, require, pluginsDir, pluginOptions,

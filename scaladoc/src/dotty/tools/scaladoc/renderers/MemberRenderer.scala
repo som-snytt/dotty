@@ -238,7 +238,7 @@ class MemberRenderer(signatureRenderer: SignatureRenderer)(using DocContext) ext
   }
 
   def annotations(member: Member): Option[TagArg] =
-   val rawBuilder = SignatureBuilder().annotationsBlock(member)
+   val rawBuilder = SignatureBuilder(Nil).annotationsBlock(member)
    val signatures = rawBuilder.content
    val rendered = signatures.map(renderElement(_))
    Option.when(rendered.nonEmpty)(span(cls := "annotations monospace")(rendered))
@@ -410,11 +410,11 @@ class MemberRenderer(signatureRenderer: SignatureRenderer)(using DocContext) ext
         case _ => None
       }.collect {
         case (Some(on), members) =>
-          val typeSig = SignatureBuilder()
+          val typeSig = SignatureBuilder(Nil)
             .keyword("extension ")
             .typeParamList(on.typeParams)
             .content
-          val argsSig = SignatureBuilder()
+          val argsSig = SignatureBuilder(Nil)
             .functionTermParameters(on.argsLists)
             .content
           val sig = typeSig ++ argsSig

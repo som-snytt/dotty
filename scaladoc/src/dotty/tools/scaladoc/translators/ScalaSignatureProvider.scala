@@ -4,7 +4,7 @@ package translators
 import scala.util.chaining._
 
 class ScalaSignatureProvider:
-  val builder = SignatureBuilder()
+  val builder = SignatureBuilder(Nil)
   given Conversion[SignatureBuilder, Signature] = bdr => bdr.content
   def rawSignature(documentable: Member)(allowCC: Boolean /*capture checking enabled?*/)(kind: Kind = documentable.kind): MemberSignature =
     kind match
