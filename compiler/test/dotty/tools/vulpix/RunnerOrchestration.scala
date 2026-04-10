@@ -112,7 +112,7 @@ trait RunnerOrchestration:
       export p.{exitValue, destroy}
     end RunnerProcess
 
-    private class Runner(process: RunnerProcess):
+    private class Runner(process: RunnerProcess) {
       /** Checks whether the underlying process is still alive. */
       def isAlive: Boolean = process.isAlive
 
@@ -173,6 +173,7 @@ trait RunnerOrchestration:
       private def awaitStatus(future: Future[Status]): Status =
         try Await.result(future, maxDuration)
         catch case _: TimeoutException => Timeout
+    }
     end Runner
 
     /** Create a process which has the classpath of the `ChildJVMMain` and the
@@ -215,8 +216,8 @@ trait RunnerOrchestration:
     }
 
     private def discardRunner(runner: Runner): Unit = synchronized {
-      runner.kill()
       busyRunners -= runner
+      runner.kill()
       notify()
     }
 
